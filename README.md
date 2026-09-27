@@ -10,7 +10,10 @@ client-seitig, kein Server/Backend nötig.
 ## Features
 
 - YouTube-Video per Link oder Video-ID laden, Play/Pause/Neustart, einfache Warteliste für den nächsten Song
-- Getrennte Lautstärkeregler für Video-Ton (YouTube-Player) und Mikrofone (Web-Audio-Mixer)
+- **Alternativ: lokale Videodatei** (MP4/WebM/…) direkt abspielen – nützlich, wenn ein YouTube-Video das
+  Einbetten nicht erlaubt, oder für eigene Karaoke-Videos. Der Ton läuft dabei sogar echt über die
+  Web-Audio-Engine (keine Cross-Origin-Einschränkung wie bei YouTube)
+- Getrennte Lautstärkeregler für Video-Ton (YouTube-Player bzw. Web-Audio-Gain bei lokaler Datei) und Mikrofone (Web-Audio-Mixer)
 - Zwei unabhängige Mikrofon-Kanäle mit je eigener Lautstärke, Delay (0–500 ms) und Stumm-Schalter, inkl. VU-Meter
 - **Stereo-Splitting**: Ein 2-kanaliges USB-Mikrofon (z.B. das originale SingStar-USB-Dongle für PS2)
   wird automatisch in Mikro 1 (links) und Mikro 2 (rechts) aufgeteilt

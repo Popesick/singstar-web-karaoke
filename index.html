@@ -29,26 +29,43 @@
 
     <!-- VIDEO / STAGE -->
     <section class="panel video-panel">
+      <div class="source-tabs">
+        <button id="tabYoutube" class="tab-btn active" data-mode="youtube">YouTube</button>
+        <button id="tabLocal" class="tab-btn" data-mode="local">Lokale Datei</button>
+      </div>
+
       <div class="video-wrap">
         <div id="player"></div>
+        <video id="localVideo" class="local-video hidden" playsinline></video>
         <div id="videoPlaceholder" class="video-placeholder">
-          <p>Kein Video geladen.<br>YouTube-Link oder Video-ID unten einfügen &amp; laden.</p>
+          <p>Kein Video geladen.<br>YouTube-Link/Video-ID einfügen oder eine lokale Videodatei auswählen.</p>
         </div>
       </div>
 
-      <div class="video-controls">
+      <div id="youtubeControls" class="video-controls">
         <input id="videoUrl" type="text" placeholder="YouTube-Link oder Video-ID einfügen…" autocomplete="off">
         <button id="btnLoad" class="btn primary">Laden</button>
+      </div>
+
+      <div id="localControls" class="video-controls hidden">
+        <label for="localFileInput" class="btn primary file-btn">Datei auswählen</label>
+        <input id="localFileInput" type="file" accept="video/*" class="file-input">
+        <span id="localFileName" class="file-name">Keine Datei ausgewählt</span>
+      </div>
+
+      <div class="video-controls">
         <button id="btnPlayPause" class="btn" disabled>▶ Play</button>
         <button id="btnRestart" class="btn" disabled>⟲ Neustart</button>
       </div>
 
-      <div class="queue-row">
-        <input id="queueUrl" type="text" placeholder="Nächsten Song zur Warteliste hinzufügen…" autocomplete="off">
-        <button id="btnQueueAdd" class="btn">+ Warteliste</button>
-        <button id="btnQueueNext" class="btn" disabled>Nächster ▶</button>
+      <div id="queueSection">
+        <div class="queue-row">
+          <input id="queueUrl" type="text" placeholder="Nächsten Song zur Warteliste hinzufügen…" autocomplete="off">
+          <button id="btnQueueAdd" class="btn">+ Warteliste</button>
+          <button id="btnQueueNext" class="btn" disabled>Nächster ▶</button>
+        </div>
+        <ul id="queueList" class="queue-list"></ul>
       </div>
-      <ul id="queueList" class="queue-list"></ul>
     </section>
 
     <!-- MIXER -->
@@ -188,7 +205,24 @@
         per Delay-Node verzögert.</li>
       <li>Bei Wiedergabe über Lautsprecher (statt Kopfhörer) kann es zu Rückkopplungen/Echo kommen – für
         beste Ergebnisse Kopfhörer für die Sänger:innen verwenden oder Lautsprecher-Lautstärke moderat halten.</li>
+      <li>Manche YouTube-Videos lassen sich vom Rechteinhaber nicht extern einbetten ("Video nicht
+        verfügbar" / Embedding deaktiviert). Das ist eine bewusste YouTube-seitige Einschränkung und lässt
+        sich nicht umgehen – in diesem Fall den Modus <b>Lokale Datei</b> mit einer legal vorliegenden
+        Videodatei desselben Songs nutzen.</li>
     </ul>
+
+    <h3>Modus "Lokale Datei"</h3>
+    <p>
+      Alternativ zu YouTube lässt sich eine eigene Videodatei (MP4, WebM, …) direkt aus dem Dateisystem laden
+      und abspielen – z.B. selbst erstellte Karaoke-Videos oder legal erworbene/lizenzierte Dateien. Der
+      große Vorteil gegenüber YouTube: Da hier kein Cross-Origin-iframe im Weg steht, wird der Video-Ton
+      <b>echt in die Web-Audio-Engine eingespeist</b> und läuft über denselben Ausgabepfad wie die Mikrofone –
+      Lautstärke- und Sync-Regelung greifen hier technisch identisch.
+    </p>
+    <p class="hint">
+      Bitte nur Dateien verwenden, an denen die entsprechenden Rechte vorliegen (eigene Aufnahmen, gekaufte/
+      lizenzierte Inhalte). Die Datei verlässt den Browser nicht – sie wird nur lokal abgespielt.
+    </p>
   </div>
 </div>
 

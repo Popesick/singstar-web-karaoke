@@ -7,12 +7,22 @@
   const STORAGE_KEY = 'singstar-karaoke-settings-v1';
 
   const els = {
+    tabYoutube: document.getElementById('tabYoutube'),
+    tabLocal: document.getElementById('tabLocal'),
+    youtubeControls: document.getElementById('youtubeControls'),
+    localControls: document.getElementById('localControls'),
+    playerEl: document.getElementById('player'),
+    localVideo: document.getElementById('localVideo'),
+    localFileInput: document.getElementById('localFileInput'),
+    localFileName: document.getElementById('localFileName'),
+
     videoUrl: document.getElementById('videoUrl'),
     btnLoad: document.getElementById('btnLoad'),
     btnPlayPause: document.getElementById('btnPlayPause'),
     btnRestart: document.getElementById('btnRestart'),
     videoPlaceholder: document.getElementById('videoPlaceholder'),
 
+    queueSection: document.getElementById('queueSection'),
     queueUrl: document.getElementById('queueUrl'),
     btnQueueAdd: document.getElementById('btnQueueAdd'),
     btnQueueNext: document.getElementById('btnQueueNext'),
@@ -103,14 +113,36 @@
   }
 
   // ---------------------------------------------------------------------
-  // YouTube Player
+  // Shared audio context (used by both the local-file video source and the
+  // microphone mixer)
   // ---------------------------------------------------------------------
-  let player = null;
-  let playerReady = false;
+  let audioCtx = null;
+  function ensureAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  // ---------------------------------------------------------------------
+  // Video source mode: 'youtube' or 'local'. Both sources are wrapped behind
+  // a small adapter interface (getState/getCurrentTime/seekTo/play/pause/
+  // setVolume) so the transport buttons and the sync-offset loop below don't
+  // need to care which one is active.
+  // ---------------------------------------------------------------------
+  let mode = 'youtube';
+  let ytVideoLoaded = false;
+  let localObjectUrl = null;
+  let localSourceNode = null;
+  let localVideoGain = null;
+
   let videoOffsetMs = Number(settings.videoOffset) || 0;
   let syncBaseWallClock = null; // Date.now() at play start
-  let syncBaseVideoTime = null; // player.getCurrentTime() at play start
+  let syncBaseVideoTime = null; // adapter.getCurrentTime() at play start
   let syncTimer = null;
+
+  // --- YouTube player ---
+  let player = null;
+  let playerReady = false;
 
   window.onYouTubeIframeAPIReady = function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
@@ -135,33 +167,111 @@
   }
 
   function onPlayerStateChange(event) {
-    if (event.data === YT.PlayerState.PLAYING) {
+    if (mode !== 'youtube') return;
+    if (event.data === YT.PlayerState.PLAYING) handlePlaybackStateChange('playing');
+    else if (event.data === YT.PlayerState.PAUSED) handlePlaybackStateChange('paused');
+    else if (event.data === YT.PlayerState.ENDED) handlePlaybackStateChange('ended');
+  }
+
+  const youtubeAdapter = {
+    getState() {
+      if (!playerReady) return 'unstarted';
+      const s = player.getPlayerState();
+      if (s === YT.PlayerState.PLAYING) return 'playing';
+      if (s === YT.PlayerState.PAUSED) return 'paused';
+      if (s === YT.PlayerState.ENDED) return 'ended';
+      return 'other';
+    },
+    getCurrentTime: () => (playerReady ? player.getCurrentTime() : 0),
+    seekTo: (t) => { if (playerReady) player.seekTo(Math.max(0, t), true); },
+    play: () => { if (playerReady) player.playVideo(); },
+    pause: () => { if (playerReady) player.pauseVideo(); },
+    setVolume: (v) => { if (playerReady) player.setVolume(v); },
+  };
+
+  // --- Local video file ---
+  function ensureLocalAudioGraph() {
+    const ctx = ensureAudioCtx();
+    if (!localSourceNode) {
+      localSourceNode = ctx.createMediaElementSource(els.localVideo);
+      localVideoGain = ctx.createGain();
+      localVideoGain.gain.value = Number(els.videoVolume.value) / 100;
+      localSourceNode.connect(localVideoGain);
+      localVideoGain.connect(ctx.destination);
+    }
+  }
+
+  els.localFileInput.addEventListener('change', () => {
+    const file = els.localFileInput.files[0];
+    if (!file) return;
+    if (localObjectUrl) URL.revokeObjectURL(localObjectUrl);
+    localObjectUrl = URL.createObjectURL(file);
+    els.localVideo.src = localObjectUrl;
+    els.localFileName.textContent = file.name;
+    ensureLocalAudioGraph();
+    updatePlaceholder();
+    updateTransportButtons();
+  });
+
+  els.localVideo.addEventListener('play', () => { if (mode === 'local') handlePlaybackStateChange('playing'); });
+  els.localVideo.addEventListener('pause', () => { if (mode === 'local') handlePlaybackStateChange('paused'); });
+  els.localVideo.addEventListener('ended', () => { if (mode === 'local') handlePlaybackStateChange('ended'); });
+
+  const localAdapter = {
+    getState: () => (!els.localVideo.src ? 'unstarted' : els.localVideo.ended ? 'ended' : els.localVideo.paused ? 'paused' : 'playing'),
+    getCurrentTime: () => els.localVideo.currentTime || 0,
+    seekTo: (t) => { els.localVideo.currentTime = Math.max(0, t); },
+    play: () => { ensureAudioCtx(); els.localVideo.play().catch((e) => console.warn('Lokale Wiedergabe fehlgeschlagen:', e)); },
+    pause: () => els.localVideo.pause(),
+    setVolume: (v) => { if (localVideoGain) localVideoGain.gain.value = v / 100; },
+  };
+
+  function getActiveAdapter() {
+    return mode === 'youtube' ? youtubeAdapter : localAdapter;
+  }
+
+  function hasActiveContent() {
+    return mode === 'youtube' ? ytVideoLoaded : !!els.localVideo.src;
+  }
+
+  function updatePlaceholder() {
+    els.videoPlaceholder.style.display = hasActiveContent() ? 'none' : 'flex';
+  }
+
+  function updateTransportButtons() {
+    const has = hasActiveContent();
+    els.btnPlayPause.disabled = !has;
+    els.btnRestart.disabled = !has;
+  }
+
+  function handlePlaybackStateChange(state) {
+    if (state === 'playing') {
       els.btnPlayPause.textContent = '⏸ Pause';
       syncBaseWallClock = Date.now();
-      syncBaseVideoTime = player.getCurrentTime();
+      syncBaseVideoTime = getActiveAdapter().getCurrentTime();
       startSyncLoop();
-    } else if (event.data === YT.PlayerState.PAUSED) {
+    } else if (state === 'paused') {
       els.btnPlayPause.textContent = '▶ Play';
       stopSyncLoop();
-    } else if (event.data === YT.PlayerState.ENDED) {
+    } else if (state === 'ended') {
       els.btnPlayPause.textContent = '▶ Play';
       stopSyncLoop();
-      if (queue.length > 0) playNextInQueue();
+      if (mode === 'youtube' && queue.length > 0) playNextInQueue();
     }
   }
 
   function startSyncLoop() {
     stopSyncLoop();
     syncTimer = setInterval(() => {
-      if (!playerReady || !player || typeof player.getPlayerState !== 'function') return;
-      if (player.getPlayerState() !== YT.PlayerState.PLAYING) return;
+      const adapter = getActiveAdapter();
+      if (adapter.getState() !== 'playing') return;
       const elapsedSec = (Date.now() - syncBaseWallClock) / 1000;
       const targetSec = syncBaseVideoTime + elapsedSec + videoOffsetMs / 1000;
-      const actualSec = player.getCurrentTime();
+      const actualSec = adapter.getCurrentTime();
       const drift = targetSec - actualSec;
       // Only correct on drift beyond ~120ms to avoid stutter from constant seeking.
       if (Math.abs(drift) > 0.12) {
-        player.seekTo(Math.max(0, targetSec), true);
+        adapter.seekTo(targetSec);
       }
     }, 500);
   }
@@ -173,6 +283,28 @@
     }
   }
 
+  function setMode(newMode) {
+    if (mode === newMode) return;
+    getActiveAdapter().pause();
+    stopSyncLoop();
+    mode = newMode;
+
+    els.tabYoutube.classList.toggle('active', mode === 'youtube');
+    els.tabLocal.classList.toggle('active', mode === 'local');
+    els.youtubeControls.classList.toggle('hidden', mode !== 'youtube');
+    els.localControls.classList.toggle('hidden', mode !== 'local');
+    els.playerEl.classList.toggle('hidden', mode !== 'youtube');
+    els.localVideo.classList.toggle('hidden', mode !== 'local');
+    els.queueSection.classList.toggle('hidden', mode !== 'youtube');
+
+    els.btnPlayPause.textContent = '▶ Play';
+    updatePlaceholder();
+    updateTransportButtons();
+  }
+
+  els.tabYoutube.addEventListener('click', () => setMode('youtube'));
+  els.tabLocal.addEventListener('click', () => setMode('local'));
+
   function loadVideo(idOrUrl) {
     const id = extractVideoId(idOrUrl);
     if (!id) {
@@ -183,11 +315,11 @@
       alert('YouTube-Player ist noch nicht bereit, bitte kurz warten.');
       return false;
     }
-    els.videoPlaceholder.style.display = 'none';
     player.loadVideoById(id);
     player.setVolume(Number(els.videoVolume.value));
-    els.btnPlayPause.disabled = false;
-    els.btnRestart.disabled = false;
+    ytVideoLoaded = true;
+    updatePlaceholder();
+    updateTransportButtons();
     return true;
   }
 
@@ -197,23 +329,21 @@
   });
 
   els.btnPlayPause.addEventListener('click', () => {
-    if (!playerReady) return;
-    const state = player.getPlayerState();
-    if (state === YT.PlayerState.PLAYING) {
-      player.pauseVideo();
-    } else {
-      player.playVideo();
-    }
+    const adapter = getActiveAdapter();
+    if (!hasActiveContent()) return;
+    if (adapter.getState() === 'playing') adapter.pause();
+    else adapter.play();
   });
 
   els.btnRestart.addEventListener('click', () => {
-    if (!playerReady) return;
-    player.seekTo(0, true);
-    player.playVideo();
+    const adapter = getActiveAdapter();
+    if (!hasActiveContent()) return;
+    adapter.seekTo(0);
+    adapter.play();
   });
 
   // ---------------------------------------------------------------------
-  // Queue
+  // Queue (YouTube only)
   // ---------------------------------------------------------------------
   const queue = [];
 
@@ -263,7 +393,8 @@
   els.videoVolume.addEventListener('input', () => {
     const v = Number(els.videoVolume.value);
     els.videoVolumeVal.textContent = v;
-    if (playerReady) player.setVolume(v);
+    youtubeAdapter.setVolume(v);
+    localAdapter.setVolume(v);
     saveSettings({ videoVolume: v });
   });
 
@@ -276,7 +407,6 @@
   // ---------------------------------------------------------------------
   // Web Audio mic mixer
   // ---------------------------------------------------------------------
-  let audioCtx = null;
   let micStream = null;
   let sourceNode = null;
   let splitterNode = null;
@@ -330,8 +460,8 @@
       };
       micStream = await navigator.mediaDevices.getUserMedia(constraints);
 
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      const ctx = ensureAudioCtx();
+      if (ctx.state === 'suspended') await ctx.resume();
 
       buildAudioGraph();
 
@@ -547,6 +677,8 @@
   restoreUi();
   renderQueue();
   listAudioInputDevices();
+  updatePlaceholder();
+  updateTransportButtons();
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     els.micStatus.textContent = 'Dieser Browser unterstützt keinen Mikrofonzugriff (getUserMedia fehlt).';
