@@ -221,6 +221,7 @@
   let playerReady = false;
 
   window.onYouTubeIframeAPIReady = function onYouTubeIframeAPIReady() {
+    if (player) return; // guard against the watchdog below re-triggering this more than once
     player = new YT.Player('player', {
       height: '100%',
       width: '100%',
@@ -242,6 +243,30 @@
     els.ytStatus.textContent = 'YouTube-Player: bereit';
     player.setVolume(Number(els.videoVolume.value));
   }
+
+  // Watchdog: "YouTube-Player: wird geladen…" staying stuck indefinitely
+  // (not just slow) usually means the network request for the iframe_api
+  // script itself failed or stalled outright — waiting longer within the
+  // same page load won't fix that, since that request is never coming
+  // back. Instead of requiring a full manual page reload, re-inject a
+  // fresh (cache-busted) copy of the script every few seconds; a transient
+  // blip often clears up within a handful of attempts. Harmless if the
+  // original request eventually does succeed — the watchdog just stops.
+  let ytWatchdogAttempts = 0;
+  function ytApiWatchdog() {
+    if (playerReady) return;
+    ytWatchdogAttempts++;
+    if (ytWatchdogAttempts > 6) {
+      els.ytStatus.textContent = 'YouTube-Player: konnte nicht geladen werden (Netzwerk/Blocker?)';
+      return;
+    }
+    els.ytStatus.textContent = `YouTube-Player: erneuter Versuch (${ytWatchdogAttempts})…`;
+    const script = document.createElement('script');
+    script.src = `https://www.youtube.com/iframe_api?retry=${ytWatchdogAttempts}-${Date.now()}`;
+    document.body.appendChild(script);
+    setTimeout(ytApiWatchdog, 5000);
+  }
+  setTimeout(ytApiWatchdog, 4000);
 
   function onPlayerError(event) {
     // YT error codes: 2 = ungültige Video-ID, 5 = HTML5-Player-Fehler,
@@ -450,10 +475,14 @@
     }
     if (!playerReady) {
       // The YT IFrame API can take a moment after page load to finish
-      // initializing (it fetches extra resources from youtube.com, and on a
-      // slow connection or first cold load that can take longer than a few
-      // seconds). Retry quietly for up to ~8s before showing anything.
-      if (attempt < 40) {
+      // initializing (it fetches extra resources from youtube.com) — after
+      // a reload this has repeatedly taken noticeably longer than a few
+      // seconds in practice (sometimes 10s+) before sorting itself out on
+      // its own, so this waits quietly for up to ~35s before giving up.
+      if (attempt === 15) {
+        els.ytStatus.textContent = 'YouTube-Player: wird noch vorbereitet…';
+      }
+      if (attempt < 175) {
         setTimeout(() => loadVideo(idOrUrl, { attempt: attempt + 1, onLoaded: options.onLoaded }), 200);
       } else {
         showPlayerError();
@@ -1023,10 +1052,24 @@
   let mergerNode = null;
 
   const chain = {
-    1: { gain: null, delay: null, analyser: null, muteGain: null },
-    2: { gain: null, delay: null, analyser: null, muteGain: null },
+    1: { gain: null, delay: null, analyser: null, muteGain: null, limiter: null },
+    2: { gain: null, delay: null, analyser: null, muteGain: null, limiter: null },
   };
   let masterGainNode = null;
+  let masterLimiterNode = null;
+
+  // Shared limiter settings, same as the ones used for phone mics — caps a
+  // feedback loop's runaway gain instead of eliminating it outright, which
+  // acoustic feedback (mic hearing the room's own speakers) can't fully be.
+  function createLimiter(ctx) {
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -18;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 12;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.15;
+    return limiter;
+  }
 
   let vuAnimHandle = null;
 
@@ -1059,24 +1102,41 @@
       await listAudioInputDevices(settings.micDeviceId);
 
       const deviceId = els.micDeviceSelect.value || undefined;
-      const constraints = {
-        audio: {
-          deviceId: deviceId ? { exact: deviceId } : undefined,
-          channelCount: { ideal: 2 },
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
+      const baseConstraints = {
+        deviceId: deviceId ? { exact: deviceId } : undefined,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
       };
-      micStream = await navigator.mediaDevices.getUserMedia(constraints);
+      // "ideal" is a soft hint — the browser can (and on some USB audio
+      // drivers/OS setups silently does) hand back a downmixed mono stream
+      // without that counting as an error, which is exactly what merges
+      // two SingStar mics onto a single channel instead of splitting them.
+      // Asking for "exact" first forces a real failure we can detect and
+      // fall back from, rather than a silent, wrong success.
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { ...baseConstraints, channelCount: { exact: 2 } },
+        });
+      } catch (e) {
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { ...baseConstraints, channelCount: { ideal: 2 } },
+        });
+      }
 
       const ctx = ensureAudioCtx();
       if (ctx.state === 'suspended') await ctx.resume();
 
       buildAudioGraph();
 
-      els.micStatus.textContent = 'Mikrofone aktiv.';
-      els.micStatus.style.color = 'var(--ok)';
+      const actualChannels = (micStream.getAudioTracks()[0].getSettings().channelCount) || 1;
+      if (actualChannels >= 2) {
+        els.micStatus.textContent = 'Mikrofone aktiv (Stereo erkannt — Mikro 1/2 sind getrennt).';
+      } else {
+        els.micStatus.textContent = 'Mikrofone aktiv, aber nur 1 Kanal (Mono) erkannt — Mikro 1 und 2 laufen '
+          + 'zusammen auf einem Kanal. Das Gerät/der Treiber liefert hier offenbar kein echtes Stereo.';
+      }
+      els.micStatus.style.color = actualChannels >= 2 ? 'var(--ok)' : 'var(--danger)';
       els.audioStatus.textContent = `Audio-Engine: aktiv (${audioCtx.sampleRate} Hz)`;
       saveSettings({ micDeviceId: deviceId || null });
 
@@ -1089,12 +1149,12 @@
   }
 
   function disconnectAudioGraph() {
-    [sourceNode, splitterNode, mergerNode, masterGainNode].forEach((n) => {
+    [sourceNode, splitterNode, mergerNode, masterGainNode, masterLimiterNode].forEach((n) => {
       if (n) try { n.disconnect(); } catch (e) { /* noop */ }
     });
     [1, 2].forEach((ch) => {
       const c = chain[ch];
-      [c.gain, c.delay, c.analyser, c.muteGain].forEach((n) => {
+      [c.gain, c.delay, c.analyser, c.muteGain, c.limiter].forEach((n) => {
         if (n) try { n.disconnect(); } catch (e) { /* noop */ }
       });
     });
@@ -1110,7 +1170,12 @@
 
     masterGainNode = audioCtx.createGain();
     masterGainNode.gain.value = Number(els.masterMicGain.value) / 100;
-    masterGainNode.connect(audioCtx.destination);
+    // Extra safety net on the combined signal, on top of each channel's own
+    // limiter below — a broader guard against the summed output clipping
+    // or running away, not just any one mic's individual contribution.
+    masterLimiterNode = createLimiter(audioCtx);
+    masterGainNode.connect(masterLimiterNode);
+    masterLimiterNode.connect(audioCtx.destination);
 
     function buildChannelChain(ch, inputNode) {
       const c = chain[ch];
@@ -1123,6 +1188,11 @@
       c.muteGain = audioCtx.createGain();
       c.muteGain.gain.value = els[`mic${ch}Mute`].checked ? 0 : 1;
 
+      // Same feedback-runaway safety valve as the phone mics: SingStar/USB
+      // mics sit close to speakers just as often, and open mic + open
+      // speaker in the same room can't be fixed by gain staging alone.
+      c.limiter = createLimiter(audioCtx);
+
       c.analyser = audioCtx.createAnalyser();
       c.analyser.fftSize = 256;
       c.analyser.smoothingTimeConstant = 0.6;
@@ -1130,7 +1200,8 @@
       inputNode.connect(c.gain);
       c.gain.connect(c.delay);
       c.delay.connect(c.muteGain);
-      c.muteGain.connect(c.analyser);
+      c.muteGain.connect(c.limiter);
+      c.limiter.connect(c.analyser);
       c.analyser.connect(masterGainNode);
     }
 
@@ -1302,17 +1373,7 @@
       delay.delayTime.value = entry.delayVal / 1000;
       const muteGain = ctx.createGain();
       muteGain.gain.value = entry.muted ? 0 : 1;
-      // Acts as a limiter against feedback runaway: a phone mic picking up
-      // the host's own speakers and feeding that back in is an acoustic
-      // loop no software can fully remove, but capping how loud any single
-      // pass through it can get keeps a buildup from screaming instead of
-      // just eliminating it outright.
-      const limiter = ctx.createDynamicsCompressor();
-      limiter.threshold.value = -18;
-      limiter.knee.value = 6;
-      limiter.ratio.value = 12;
-      limiter.attack.value = 0.003;
-      limiter.release.value = 0.15;
+      const limiter = createLimiter(ctx);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.6;

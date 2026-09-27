@@ -44,9 +44,10 @@
         </div>
         <div id="playerErrorBanner" class="player-error hidden">
           <p><b>YouTube-Player konnte nicht geladen werden.</b></p>
-          <p>Meist ein Ad-/Tracking-Blocker, der das YouTube-Embed-Script blockiert (auch wenn youtube.com
-            selbst normal funktioniert). Blocker für diese Seite deaktivieren/whitelisten, dann erneut
-            versuchen.</p>
+          <p>Die App hat bereits mehrfach automatisch versucht, das YouTube-Script neu zu laden (siehe Status
+            unten), ohne Erfolg. Meist ein Ad-/Tracking-Blocker, der das YouTube-Embed-Script blockiert (auch
+            wenn youtube.com selbst normal funktioniert), gelegentlich auch nur eine vorübergehende
+            Netzwerkstörung. Blocker für diese Seite deaktivieren/whitelisten, dann erneut versuchen.</p>
           <button id="btnRetryPlayer" class="btn primary small">Erneut versuchen</button>
         </div>
       </div>
@@ -376,24 +377,26 @@
       verfügbar) gibt den Platz wieder frei.
     </p>
 
-    <h3>Rückkopplung/Pfeifen/Hall bei Handy-Mikros</h3>
+    <h3>Rückkopplung/Pfeifen/Hall bei Mikrofonen (Handy &amp; lokal)</h3>
     <p>
-      Wenn das Handy-Mikro in der Nähe der Lautsprecher der Hauptsession steht, kann es passieren, dass es
-      deren Ausgabe (Video + bereits gemischte Stimmen) wieder mit aufnimmt – das geht zurück in den Mix, wird
-      erneut abgespielt, erneut aufgenommen usw. Das ist eine akustische Rückkopplung (wie bei jeder PA-Anlage)
-      und lässt sich nicht rein softwareseitig auf null bringen, wenn Mikro und Lautsprecher im selben Raum
-      offen sind. Je nach Lautstärke/Abstand äußert sich das entweder als lautes Pfeifen oder – bei niedrigerer
-      Schleifenverstärkung – als ein hallartiges, abklingendes Echo der eigenen Stimme: Beides ist dasselbe
-      Phänomen, nur unterschiedlich stark. Die App entschärft das an drei Stellen: Handy-Mikros starten
-      standardmäßig mit einer niedrigeren Lautstärke (70% statt 100%), jeder Handy-Mikro-Kanal hat einen
-      Begrenzer (Limiter), der ein Aufschaukeln kappt statt es unkontrolliert lauter werden zu lassen, und auf
-      dem sendenden Gerät selbst lässt sich der Eingangspegel direkt an der Quelle absenken.
+      Wenn ein Mikro (Handy oder lokal angeschlossenes SingStar/USB-Mikro) in der Nähe der Lautsprecher der
+      Hauptsession steht, kann es passieren, dass es deren Ausgabe (Video + bereits gemischte Stimmen) wieder
+      mit aufnimmt – das geht zurück in den Mix, wird erneut abgespielt, erneut aufgenommen usw. Das ist eine
+      akustische Rückkopplung (wie bei jeder PA-Anlage) und lässt sich nicht rein softwareseitig auf null
+      bringen, wenn Mikro und Lautsprecher im selben Raum offen sind. Je nach Lautstärke/Abstand äußert sich
+      das entweder als lautes Pfeifen oder – bei niedrigerer Schleifenverstärkung – als ein hallartiges,
+      abklingendes Echo der eigenen Stimme: Beides ist dasselbe Phänomen, nur unterschiedlich stark. Die App
+      entschärft das an mehreren Stellen: Jeder Mikro-Kanal (Handy wie lokal) hat einen Begrenzer (Limiter),
+      der ein Aufschaukeln kappt statt es unkontrolliert lauter werden zu lassen, zusätzlich sitzt ein
+      Begrenzer auf dem gesamten Mikro-Ausgang; Handy-Mikros starten außerdem standardmäßig mit einer
+      niedrigeren Lautstärke (70% statt 100%) und lassen sich am sendenden Gerät direkt an der Quelle absenken
+      (Eingangspegel).
     </p>
     <p class="hint">
-      Hilft das nicht ausreichend: Eingangspegel auf dem Handy selbst und/oder Lautstärke des betroffenen
-      Mikros in den Einstellungen der Hauptsession weiter absenken, das Handy weiter von den Lautsprechern
-      wegbewegen bzw. die Lautsprecher-Lautstärke insgesamt reduzieren, oder für die singende Person Kopfhörer
-      statt offener Lautsprecher zum Mithören der Hauptsession verwenden.
+      Hilft das nicht ausreichend: Lautstärke bzw. Eingangspegel des betroffenen Mikros weiter absenken, das
+      Mikro weiter von den Lautsprechern wegbewegen bzw. die Lautsprecher-Lautstärke insgesamt reduzieren,
+      oder für die singende Person Kopfhörer statt offener Lautsprecher zum Mithören der Hauptsession
+      verwenden.
     </p>
 
     <h3>Original SingStar-USB-Mikrofone (PS2)</h3>
@@ -415,6 +418,17 @@
     <p class="hint">
       Hinweis: Manche Mainboards/USB-Controller liefern das Signal sehr leise. In diesem Fall den
       Regler "Lautstärke" der Mikro-Spalte über 100% anheben.
+    </p>
+    <p>
+      Nach <b>Mikros aktivieren</b> zeigt der Statustext direkt an, ob echtes Stereo erkannt wurde. Steht dort
+      "nur 1 Kanal (Mono) erkannt", liefert der Treiber/das Betriebssystem trotz Anfrage kein echtes Stereo –
+      dann laufen beide SingStar-Mikros zusammen auf Mikro 1, eine Trennung ist in diesem Fall softwareseitig
+      nicht möglich (Betriebssystem-Soundeinstellungen prüfen, ob dort eine Stereo-Option existiert).
+    </p>
+    <p class="hint">
+      Auch die lokalen Mikrofon-Kanäle (SingStar/USB) haben inzwischen denselben Begrenzer (Limiter) gegen
+      Rückkopplungs-Aufschaukeln wie die Handy-Mikros – der Abschnitt "Rückkopplung/Pfeifen/Hall bei
+      Handy-Mikros" weiter unten gilt inhaltlich genauso für sie.
     </p>
 
     <h3>Technische Grenzen</h3>

@@ -19,9 +19,11 @@ client-seitig, kein Server/Backend nötig.
   Einbetten nicht erlaubt, oder für eigene Karaoke-Videos. Der Ton läuft dabei sogar echt über die
   Web-Audio-Engine (keine Cross-Origin-Einschränkung wie bei YouTube)
 - Getrennte Lautstärkeregler für Video-Ton (YouTube-Player bzw. Web-Audio-Gain bei lokaler Datei) und Mikrofone (Web-Audio-Mixer)
-- Zwei unabhängige Mikrofon-Kanäle mit je eigener Lautstärke, Delay (0–500 ms) und Stumm-Schalter, inkl. VU-Meter
+- Zwei unabhängige Mikrofon-Kanäle mit je eigener Lautstärke, Delay (0–500 ms) und Stumm-Schalter, inkl.
+  VU-Meter und Begrenzer (Limiter) gegen Rückkopplungs-Aufschaukeln
 - **Stereo-Splitting**: Ein 2-kanaliges USB-Mikrofon (z.B. das originale SingStar-USB-Dongle für PS2)
-  wird automatisch in Mikro 1 (links) und Mikro 2 (rechts) aufgeteilt
+  wird automatisch in Mikro 1 (links) und Mikro 2 (rechts) aufgeteilt (erzwingt echtes Stereo per
+  `channelCount: exact 2`, mit Fallback und klarer Statusmeldung, falls das Gerät/der Treiber das nicht liefert)
 - **Sync-Offset** für das Video (±500 ms), um Bild/Ton bei spürbarer Latenz in der Mikrofonkette
   wieder in Einklang zu bringen
 - Einstellungen (Lautstärken, Delays, gewähltes Gerät) werden im Browser (localStorage) gemerkt
