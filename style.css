@@ -417,7 +417,10 @@ body.join-mode .transport-controls,
 body.join-mode .mixer-panel,
 body.join-mode #btnStage,
 body.join-mode .statusbar,
-body.join-mode #sessionStartRow {
+body.join-mode #sessionStartRow,
+body.join-mode #btnQueueNext {
+  /* No player exists on a joined device — advancing playback is a
+     host-only action. */
   display: none !important;
 }
 

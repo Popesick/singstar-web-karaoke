@@ -325,14 +325,23 @@
   els.tabYoutube.addEventListener('click', () => setMode('youtube'));
   els.tabLocal.addEventListener('click', () => setMode('local'));
 
-  function loadVideo(idOrUrl) {
+  function loadVideo(idOrUrl, opts) {
+    const options = opts || {};
+    const attempt = options.attempt || 0;
     const id = extractVideoId(idOrUrl);
     if (!id) {
       alert('Konnte keine gültige YouTube-Video-ID aus der Eingabe lesen.');
       return false;
     }
     if (!playerReady) {
-      alert('YouTube-Player ist noch nicht bereit, bitte kurz warten.');
+      // The YT IFrame API can take a moment after page load to finish
+      // initializing (it fetches extra resources from youtube.com). Retry
+      // quietly for a few seconds before bothering the user with an alert.
+      if (attempt < 16) {
+        setTimeout(() => loadVideo(idOrUrl, { attempt: attempt + 1, onLoaded: options.onLoaded }), 200);
+      } else {
+        alert('YouTube-Player konnte nicht geladen werden (evtl. durch einen Ad-/Script-Blocker blockiert). Bitte Seite neu laden.');
+      }
       return false;
     }
     player.loadVideoById(id);
@@ -340,6 +349,7 @@
     ytVideoLoaded = true;
     updatePlaceholder();
     updateTransportButtons();
+    if (options.onLoaded) options.onLoaded();
     return true;
   }
 
@@ -569,8 +579,9 @@
     if (queue.length === 0) return;
     const next = queue.shift();
     renderQueue();
-    loadVideo(next.videoId);
-    setTimeout(() => player && player.playVideo && player.playVideo(), 300);
+    loadVideo(next.videoId, {
+      onLoaded: () => setTimeout(() => player && player.playVideo && player.playVideo(), 200),
+    });
     if (roomCode) removeQueueItemFromRoom(next.id);
   }
 
