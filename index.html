@@ -4,8 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SingStar Web Karaoke</title>
+<!-- style.css/app.js carry a ?v= cache-buster: GitHub Pages serves them with
+     max-age=600, and a normal (non-hard) browser reload only revalidates the
+     top-level HTML document, not these subresources — without a version bump
+     a plain reload can keep running old cached JS/CSS for up to 10 minutes
+     after a deploy. Bump both ?v= values (any change is enough) whenever
+     app.js or style.css changes. -->
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260927a">
 </head>
 <body>
 
@@ -513,6 +519,6 @@
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=20260927a"></script>
 </body>
 </html>

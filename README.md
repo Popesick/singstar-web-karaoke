@@ -105,6 +105,12 @@ Frontend: Kein Build-Schritt, keine Abhängigkeiten außer der YouTube-IFrame-AP
 `<script>`-Tag von YouTube geladen). Der Worker im `worker/`-Verzeichnis ist ein separates,
 eigenständig deploybares Projekt (Details dort).
 
+`style.css`/`app.js` werden in `index.html` mit einem `?v=…`-Cache-Buster eingebunden, da GitHub
+Pages sie mit `max-age=600` ausliefert und ein normaler Browser-Reload (anders als ein Hard-Reload)
+nur das HTML-Dokument selbst neu validiert, nicht dessen Subresourcen – ohne Versionsbump kann ein
+einfacher Reload bis zu 10 Minuten lang noch die alte JS/CSS-Version ausliefern. Bei jeder Änderung
+an `app.js` oder `style.css` daher den `?v=`-Wert in `index.html` mit hochzählen.
+
 ## GitHub Pages aktivieren
 
 Im Repository unter **Settings → Pages** als Quelle den `main`-Branch (Root) auswählen.
