@@ -52,6 +52,9 @@
     btnUsePhoneAsMic: document.getElementById('btnUsePhoneAsMic'),
     btnStopPhoneAsMic: document.getElementById('btnStopPhoneAsMic'),
     phoneMicStatus: document.getElementById('phoneMicStatus'),
+    phoneMicActive: document.getElementById('phoneMicActive'),
+    phoneMicIcon: document.getElementById('phoneMicIcon'),
+    phoneMicVu: document.getElementById('phoneMicVu'),
     phoneMicsGroup: document.getElementById('phoneMicsGroup'),
     phoneMicsHint: document.getElementById('phoneMicsHint'),
     phoneMicsList: document.getElementById('phoneMicsList'),
@@ -1197,6 +1200,13 @@
         try { n.disconnect(); } catch (e) { /* noop */ }
       });
     }
+    if (entry.decoyAudioEl) {
+      try {
+        entry.decoyAudioEl.pause();
+        entry.decoyAudioEl.srcObject = null;
+        entry.decoyAudioEl.remove();
+      } catch (e) { /* noop */ }
+    }
     delete phoneMics[slot];
     renderPhoneMics();
     if (notifyServer && roomCode) {
@@ -1216,6 +1226,23 @@
 
     pc.ontrack = (event) => {
       const stream = event.streams[0];
+
+      // Some browsers (notably iOS/mobile) never actually decode a remote
+      // WebRTC audio track's frames unless something plays it via a real
+      // <audio>/<video> element — createMediaStreamSource() alone can end
+      // up reading a track that's technically "live" but delivers silence.
+      // Muted so this never produces its own audible/duplicate output;
+      // Web Audio below handles the real, controllable output.
+      const decoyAudioEl = document.createElement('audio');
+      decoyAudioEl.autoplay = true;
+      decoyAudioEl.muted = true;
+      decoyAudioEl.playsInline = true;
+      decoyAudioEl.srcObject = stream;
+      decoyAudioEl.style.display = 'none';
+      document.body.appendChild(decoyAudioEl);
+      decoyAudioEl.play().catch(() => {});
+      entry.decoyAudioEl = decoyAudioEl;
+
       const source = ctx.createMediaStreamSource(stream);
       const gain = ctx.createGain();
       gain.gain.value = entry.gainVal / 100;
@@ -1425,6 +1452,17 @@
     els.phoneMicStatus.style.color = 'var(--text-dim)';
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Local monitoring only — connected to an analyser so the phone can
+      // see its own mic level, never to a destination (would echo back the
+      // singer's own voice through the phone's speaker).
+      const monitorCtx = ensureAudioCtx();
+      const monitorSource = monitorCtx.createMediaStreamSource(stream);
+      const monitorAnalyser = monitorCtx.createAnalyser();
+      monitorAnalyser.fftSize = 256;
+      monitorAnalyser.smoothingTimeConstant = 0.6;
+      monitorSource.connect(monitorAnalyser);
+
       const joinResp = await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics/join`, { method: 'POST' });
       const joinData = await joinResp.json();
       if (!joinResp.ok) throw new Error(joinData.error || `HTTP ${joinResp.status}`);
@@ -1485,9 +1523,10 @@
         }
       }, 1200);
 
-      phoneSender = { pc, stream, slot, statusTimer };
+      phoneSender = { pc, stream, slot, statusTimer, analyser: monitorAnalyser };
       els.btnUsePhoneAsMic.classList.add('hidden');
-      els.btnStopPhoneAsMic.classList.remove('hidden');
+      els.phoneMicActive.classList.remove('hidden');
+      startVuLoop();
     } catch (err) {
       els.phoneMicStatus.textContent = 'Fehler: ' + err.message;
       els.phoneMicStatus.style.color = 'var(--danger)';
@@ -1507,7 +1546,7 @@
     phoneSender = null;
     els.btnUsePhoneAsMic.classList.remove('hidden');
     els.btnUsePhoneAsMic.disabled = false;
-    els.btnStopPhoneAsMic.classList.add('hidden');
+    els.phoneMicActive.classList.add('hidden');
     els.phoneMicStatus.textContent = '';
   }
 
@@ -1517,17 +1556,22 @@
   // ---------------------------------------------------------------------
   // VU meters
   // ---------------------------------------------------------------------
+  function getAudioLevel(analyser) {
+    if (!analyser) return 0;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i];
+    return Math.min(1, (sum / data.length) / 130);
+  }
+
   function drawVu(canvas, analyser) {
     const ctx = canvas.getContext('2d');
     const w = canvas.width;
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
-    if (!analyser) return;
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteFrequencyData(data);
-    let sum = 0;
-    for (let i = 0; i < data.length; i++) sum += data[i];
-    const level = Math.min(1, (sum / data.length) / 130);
+    if (!analyser) return 0;
+    const level = getAudioLevel(analyser);
 
     const barWidth = w * level;
     const grad = ctx.createLinearGradient(0, 0, w, 0);
@@ -1536,6 +1580,7 @@
     grad.addColorStop(1, '#ff5c5c');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, barWidth, h);
+    return level;
   }
 
   function startVuLoop() {
@@ -1547,6 +1592,10 @@
         const entry = phoneMics[slot];
         if (entry && entry.vuCanvas && entry.chainNodes) drawVu(entry.vuCanvas, entry.chainNodes.analyser);
       });
+      if (phoneSender && phoneSender.analyser && els.phoneMicVu) {
+        const level = drawVu(els.phoneMicVu, phoneSender.analyser);
+        if (els.phoneMicIcon) els.phoneMicIcon.style.setProperty('--level', level.toFixed(2));
+      }
       vuAnimHandle = requestAnimationFrame(loop);
     };
     loop();

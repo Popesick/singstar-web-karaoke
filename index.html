@@ -126,7 +126,17 @@
 
           <div class="phone-mic-row">
             <button id="btnUsePhoneAsMic" class="btn primary">🎤 Als Mikro verwenden</button>
-            <button id="btnStopPhoneAsMic" class="btn ghost hidden">Mikro trennen</button>
+
+            <div id="phoneMicActive" class="phone-mic-active hidden">
+              <div id="phoneMicIcon" class="phone-mic-icon">
+                <img src="assets/mic-icon.svg" alt="Mikrofon aktiv">
+              </div>
+              <canvas id="phoneMicVu" class="vu-meter" width="260" height="16"></canvas>
+              <p class="hint">Eigener Mikrofon-Pegel — bewegt sich der Balken beim Sprechen/Singen nicht, wird dein Ton
+                nicht erfasst (Berechtigung prüfen bzw. richtiges Mikro am Gerät ausgewählt?).</p>
+              <button id="btnStopPhoneAsMic" class="btn ghost">Mikro trennen</button>
+            </div>
+
             <p id="phoneMicStatus" class="hint"></p>
             <p class="hint">Überträgt den Ton dieses Geräts in Echtzeit per WebRTC zur Hauptsession und legt ihn dort über den
               Video-Sound. Lautstärke und Verzögerung dafür stellt die Hauptsession unter Einstellungen →
@@ -303,6 +313,13 @@
       20–60 ms Latenz) direkt zur Hauptsession, wo er über den Video-Sound gelegt wird – bis zu 4 Geräte
       gleichzeitig. Die Hauptsession regelt Lautstärke, Verzögerung (Delay) und Stumm für jedes Handy-Mikro
       einzeln unter <b>⚙ Einstellungen → Externe Mikrofone (Handys)</b>, inklusive VU-Meter.
+    </p>
+    <p>
+      Beide Seiten zeigen einen eigenen Pegel-Balken zur Fehlersuche: Auf dem Handy selbst direkt unter dem
+      leuchtenden Mikro-Symbol ("bewegt sich das beim Sprechen nicht, wird dein Ton nicht erfasst" – meist
+      falsche Mikrofonauswahl oder fehlende Berechtigung am Gerät), auf der Hauptsession pro verbundenem Handy
+      in den Einstellungen ("bewegt sich das nicht, kommt der Ton dort nicht an" – meist ein
+      Verbindungsproblem statt einer fehlenden Aufnahme).
     </p>
     <p class="hint">
       Verbindungsaufbau (wer mit wem spricht) läuft über denselben Cloudflare Worker wie die Warteliste; der
