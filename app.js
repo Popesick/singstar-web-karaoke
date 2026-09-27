@@ -176,7 +176,7 @@
   // ---------------------------------------------------------------------
   let audioCtx = null;
   function ensureAudioCtx() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
   }
@@ -1218,8 +1218,11 @@
     const ctx = ensureAudioCtx();
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     const entry = {
+      // Phone mics sit close to the host's speakers far more often than a
+      // handheld USB mic does, so they default to a lower gain — 100% is a
+      // much shorter fuse away from feedback than for the local mics.
       pc, label: label || `Mikro ${slot}`, connected: false, appliedIce: new Set(),
-      chainNodes: null, gainVal: 100, delayVal: 0, muted: false, vuCanvas: null,
+      chainNodes: null, gainVal: 70, delayVal: 0, muted: false, vuCanvas: null,
     };
     phoneMics[slot] = entry;
     renderPhoneMics();
@@ -1243,6 +1246,12 @@
       decoyAudioEl.play().catch(() => {});
       entry.decoyAudioEl = decoyAudioEl;
 
+      // Ask the browser to keep as little playout buffer as it can get
+      // away with — trades a bit of resilience against network jitter for
+      // lower end-to-end latency, a reasonable trade on a home/party WiFi.
+      // Chrome-only and experimental, so feature-detected.
+      event.receiver && 'playoutDelayHint' in event.receiver && (event.receiver.playoutDelayHint = 0);
+
       const source = ctx.createMediaStreamSource(stream);
       const gain = ctx.createGain();
       gain.gain.value = entry.gainVal / 100;
@@ -1250,15 +1259,27 @@
       delay.delayTime.value = entry.delayVal / 1000;
       const muteGain = ctx.createGain();
       muteGain.gain.value = entry.muted ? 0 : 1;
+      // Acts as a limiter against feedback runaway: a phone mic picking up
+      // the host's own speakers and feeding that back in is an acoustic
+      // loop no software can fully remove, but capping how loud any single
+      // pass through it can get keeps a buildup from screaming instead of
+      // just eliminating it outright.
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -18;
+      limiter.knee.value = 6;
+      limiter.ratio.value = 12;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.15;
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.6;
       source.connect(gain);
       gain.connect(delay);
       delay.connect(muteGain);
-      muteGain.connect(analyser);
+      muteGain.connect(limiter);
+      limiter.connect(analyser);
       analyser.connect(ctx.destination);
-      entry.chainNodes = { source, gain, delay, muteGain, analyser };
+      entry.chainNodes = { source, gain, delay, muteGain, limiter, analyser };
       startVuLoop();
     };
 
@@ -1451,7 +1472,9 @@
     els.phoneMicStatus.textContent = 'Verbinde…';
     els.phoneMicStatus.style.color = 'var(--text-dim)';
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
 
       // Local monitoring only — connected to an analyser so the phone can
       // see its own mic level, never to a destination (would echo back the
