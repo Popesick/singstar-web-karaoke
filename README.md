@@ -23,7 +23,9 @@ client-seitig, kein Server/Backend nötig.
 - **Sync-Offset** für das Video (±500 ms), um Bild/Ton bei spürbarer Latenz in der Mikrofonkette
   wieder in Einklang zu bringen
 - Einstellungen (Lautstärken, Delays, gewähltes Gerät) werden im Browser (localStorage) gemerkt
-- Bühnenmodus/Vollbild für die Party
+- Bühnenmodus/Vollbild für die Party (per "Menü"-Button jederzeit zurück zur normalen Ansicht)
+- Mixer (Video-/Mikrofon-Regler) und YouTube-API-Key sind in einem eigenen "⚙ Einstellungen"-Dialog
+  gebündelt; die rechte Spalte zeigt stattdessen Warteliste, Suche und die gemeinsame Session
 - **Gemeinsame Session**: Über einen kleinen Cloudflare Worker (Durable Object pro Session) lässt sich eine
   geteilte Warteliste öffnen – andere Geräte (z.B. Gäste-Handys) scannen einen QR-Code, öffnen einen Link
   oder geben den Code ein und können Songs zur selben Warteliste hinzufügen, inklusive automatisch geteiltem
@@ -78,7 +80,7 @@ Ausführliche Hinweise gibt es auch direkt in der App über den **Hilfe**-Button
 
 ```
 singstar-karaoke/
-├── index.html      Aufbau der Seite (Video-Panel, Mixer, Hilfe-Dialog)
+├── index.html      Aufbau der Seite (Video-Panel, Playlist/Suche/Session, Einstellungen- & Hilfe-Dialog)
 ├── style.css       Dark-Stage-Theme
 ├── app.js          YouTube-Player, Web-Audio-Mixer, Sync-Logik, Persistenz, Session-Sync
 ├── assets/         Logo/Grafiken

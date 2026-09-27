@@ -79,6 +79,14 @@
     btnHelpClose: document.getElementById('btnHelpClose'),
     helpModal: document.getElementById('helpModal'),
     btnStage: document.getElementById('btnStage'),
+    btnMenu: document.getElementById('btnMenu'),
+
+    btnSettings: document.getElementById('btnSettings'),
+    btnSettingsClose: document.getElementById('btnSettingsClose'),
+    settingsModal: document.getElementById('settingsModal'),
+    btnOpenApiKeySettings: document.getElementById('btnOpenApiKeySettings'),
+
+    toast: document.getElementById('toast'),
 
     ytStatus: document.getElementById('ytStatus'),
     audioStatus: document.getElementById('audioStatus'),
@@ -106,6 +114,18 @@
   }
 
   const settings = loadSettings();
+
+  // ---------------------------------------------------------------------
+  // Toast (brief confirmation messages, e.g. "added to queue")
+  // ---------------------------------------------------------------------
+  let toastTimer = null;
+  function showToast(message) {
+    if (!els.toast) return;
+    els.toast.textContent = message;
+    els.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2200);
+  }
 
   // ---------------------------------------------------------------------
   // YouTube video ID extraction
@@ -592,12 +612,14 @@
       return;
     }
     const title = titleOverride || idOrUrl;
+    let success = true;
     if (roomCode) {
-      await pushQueueItemToRoom({ videoId, title, addedBy: '' });
+      success = await pushQueueItemToRoom({ videoId, title, addedBy: '' });
     } else {
       queue.push({ id: makeLocalId(), videoId, title, addedBy: '' });
       renderQueue();
     }
+    if (success) showToast(`✓ „${title}“ zur Warteliste hinzugefügt`);
   }
 
   els.btnQueueAdd.addEventListener('click', () => {
@@ -688,7 +710,7 @@
   }
 
   async function pushQueueItemToRoom(item) {
-    if (!roomCode) return;
+    if (!roomCode) return false;
     try {
       const resp = await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/queue`, {
         method: 'POST',
@@ -698,13 +720,15 @@
       const data = await resp.json();
       if (resp.ok) {
         applyRemoteQueue(data.queue || []);
-      } else {
-        els.sessionStatus.textContent = 'Fehler: ' + (data.error || `HTTP ${resp.status}`);
-        els.sessionStatus.style.color = 'var(--danger)';
+        return true;
       }
+      els.sessionStatus.textContent = 'Fehler: ' + (data.error || `HTTP ${resp.status}`);
+      els.sessionStatus.style.color = 'var(--danger)';
+      return false;
     } catch (e) {
       els.sessionStatus.textContent = 'Song konnte nicht synchronisiert werden (Netzwerkfehler).';
       els.sessionStatus.style.color = 'var(--danger)';
+      return false;
     }
   }
 
@@ -1047,7 +1071,7 @@
   }
 
   // ---------------------------------------------------------------------
-  // Help modal + stage mode
+  // Help + settings modals, stage mode
   // ---------------------------------------------------------------------
   els.btnHelp.addEventListener('click', () => els.helpModal.classList.remove('hidden'));
   els.btnHelpClose.addEventListener('click', () => els.helpModal.classList.add('hidden'));
@@ -1055,14 +1079,30 @@
     if (e.target === els.helpModal) els.helpModal.classList.add('hidden');
   });
 
+  function openSettings() {
+    els.settingsModal.classList.remove('hidden');
+  }
+  els.btnSettings.addEventListener('click', openSettings);
+  els.btnSettingsClose.addEventListener('click', () => els.settingsModal.classList.add('hidden'));
+  els.settingsModal.addEventListener('click', (e) => {
+    if (e.target === els.settingsModal) els.settingsModal.classList.add('hidden');
+  });
+  els.btnOpenApiKeySettings.addEventListener('click', openSettings);
+
+  // "Bühnenmodus" always (re-)enters fullscreen — pressing ESC only exits
+  // native fullscreen, it doesn't touch the stage-mode layout, so clicking
+  // the button again just re-requests fullscreen instead of leaving stage
+  // mode. "Menü" (only visible while in stage mode) is the explicit way
+  // back to the normal view.
   els.btnStage.addEventListener('click', () => {
-    document.body.classList.toggle('stage-mode');
+    document.body.classList.add('stage-mode');
     const wrap = document.querySelector('.video-wrap');
-    if (document.body.classList.contains('stage-mode') && wrap.requestFullscreen) {
-      wrap.requestFullscreen().catch(() => {});
-    } else if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
-    }
+    if (wrap.requestFullscreen) wrap.requestFullscreen().catch(() => {});
+  });
+
+  els.btnMenu.addEventListener('click', () => {
+    document.body.classList.remove('stage-mode');
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   });
 
   // ---------------------------------------------------------------------

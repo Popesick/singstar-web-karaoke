@@ -20,6 +20,8 @@
       </div>
     </div>
     <div class="topbar-actions">
+      <button id="btnMenu" class="btn ghost" title="Zurück zum Menü">☰ Menü</button>
+      <button id="btnSettings" class="btn ghost" title="Einstellungen (Mixer, API-Key)">⚙ Einstellungen</button>
       <button id="btnHelp" class="btn ghost" title="Hilfe &amp; SingStar-Mikros">Hilfe</button>
       <button id="btnStage" class="btn ghost" title="Bühnenmodus / Vollbild">Bühnenmodus</button>
     </div>
@@ -47,29 +49,6 @@
           <input id="videoUrl" type="text" placeholder="YouTube-Link oder Video-ID einfügen…" autocomplete="off">
           <button id="btnLoad" class="btn primary">Laden</button>
         </div>
-
-        <div class="search-panel">
-          <div class="video-controls">
-            <input id="searchQuery" type="text" placeholder="Karaoke-Song suchen, z.B. „Bohemian Rhapsody Karaoke"…" autocomplete="off">
-            <button id="btnSearch" class="btn primary">🔍 Suchen</button>
-          </div>
-
-          <div id="apiKeyRow" class="video-controls hidden">
-            <input id="apiKeyInput" type="password" placeholder="YouTube Data API Key einfügen…" autocomplete="off">
-            <button id="btnSaveApiKey" class="btn small primary">Speichern</button>
-          </div>
-
-          <p class="hint">
-            Die Suche nutzt die offizielle YouTube Data API und zeigt nur Videos, die sich einbetten lassen.
-            Dafür wird ein eigener, kostenloser API-Key benötigt (bleibt nur lokal in diesem Browser gespeichert).
-            <button id="btnApiKeyHelp" type="button" class="link-btn">Wie bekomme ich einen Key?</button>
-            <button id="btnApiKeyChange" type="button" class="link-btn hidden">· API-Key ändern</button>
-          </p>
-
-          <p id="searchStatus" class="hint"></p>
-          <div id="searchResults" class="search-results"></div>
-          <button id="btnSearchMore" class="btn small hidden">Mehr laden</button>
-        </div>
       </div>
 
       <div id="localControls" class="video-controls hidden">
@@ -82,7 +61,11 @@
         <button id="btnPlayPause" class="btn" disabled>▶ Play</button>
         <button id="btnRestart" class="btn" disabled>⟲ Neustart</button>
       </div>
+    </section>
 
+    <!-- PLAYLIST / SUCHE / SESSION -->
+    <section class="panel playlist-panel">
+      <h2>Warteliste</h2>
       <div id="queueSection">
         <div class="queue-row">
           <input id="queueUrl" type="text" placeholder="Nächsten Song zur Warteliste hinzufügen…" autocomplete="off">
@@ -92,7 +75,25 @@
         <ul id="queueList" class="queue-list"></ul>
       </div>
 
+      <div class="search-panel">
+        <h3>Suche</h3>
+        <div class="video-controls">
+          <input id="searchQuery" type="text" placeholder="Karaoke-Song suchen, z.B. „Bohemian Rhapsody Karaoke"…" autocomplete="off">
+          <button id="btnSearch" class="btn primary">🔍 Suchen</button>
+        </div>
+
+        <p class="hint">
+          Nutzt die offizielle YouTube Data API und zeigt nur Videos, die sich einbetten lassen.
+          <button id="btnOpenApiKeySettings" type="button" class="link-btn">API-Key verwalten</button>
+        </p>
+
+        <p id="searchStatus" class="hint"></p>
+        <div id="searchResults" class="search-results"></div>
+        <button id="btnSearchMore" class="btn small hidden">Mehr laden</button>
+      </div>
+
       <div id="sessionPanel" class="session-panel">
+        <h3>Gemeinsame Session</h3>
         <div id="sessionStartRow">
           <button id="btnSessionStart" class="btn primary">📱 Session starten (Songs vom Handy hinzufügen)</button>
         </div>
@@ -115,90 +116,6 @@
         <p id="sessionStatus" class="hint"></p>
       </div>
     </section>
-
-    <!-- MIXER -->
-    <section class="panel mixer-panel">
-      <h2>Mixer</h2>
-
-      <div class="mixer-group">
-        <div class="mixer-row head">
-          <span>Video-Ton</span>
-        </div>
-        <div class="mixer-row">
-          <label for="videoVolume">Lautstärke</label>
-          <input id="videoVolume" type="range" min="0" max="100" value="80">
-          <span id="videoVolumeVal" class="val">80</span>
-        </div>
-        <div class="mixer-row">
-          <label for="videoOffset">Sync-Offset (ms)</label>
-          <input id="videoOffset" type="range" min="-500" max="500" value="0" step="10">
-          <span id="videoOffsetVal" class="val">0</span>
-        </div>
-        <p class="hint">Positiv = Video läuft später (für langsame Mikro-Kette). Negativ = Video läuft früher.</p>
-      </div>
-
-      <div class="mixer-group">
-        <div class="mixer-row head">
-          <span>Mikrofone</span>
-          <button id="btnMicStart" class="btn small primary">Mikros aktivieren</button>
-        </div>
-
-        <div class="mixer-row">
-          <label for="micDeviceSelect">Audiogerät</label>
-          <select id="micDeviceSelect"></select>
-        </div>
-        <div class="mixer-row checkbox-row">
-          <label><input type="checkbox" id="stereoSplit" checked> Stereo-Splitting (SingStar/2-Kanal-USB: L = Mikro 1, R = Mikro 2)</label>
-        </div>
-
-        <div class="mic-columns">
-          <div class="mic-col">
-            <h3>Mikro 1 <span class="ch-tag">L</span></h3>
-            <canvas id="vu1" class="vu-meter" width="220" height="14"></canvas>
-            <div class="mixer-row">
-              <label for="mic1Gain">Lautstärke</label>
-              <input id="mic1Gain" type="range" min="0" max="200" value="100">
-              <span id="mic1GainVal" class="val">100</span>
-            </div>
-            <div class="mixer-row">
-              <label for="mic1Delay">Delay (ms)</label>
-              <input id="mic1Delay" type="range" min="0" max="500" value="0" step="5">
-              <span id="mic1DelayVal" class="val">0</span>
-            </div>
-            <div class="mixer-row checkbox-row">
-              <label><input type="checkbox" id="mic1Mute"> Stumm</label>
-            </div>
-          </div>
-
-          <div class="mic-col">
-            <h3>Mikro 2 <span class="ch-tag">R</span></h3>
-            <canvas id="vu2" class="vu-meter" width="220" height="14"></canvas>
-            <div class="mixer-row">
-              <label for="mic2Gain">Lautstärke</label>
-              <input id="mic2Gain" type="range" min="0" max="200" value="100">
-              <span id="mic2GainVal" class="val">100</span>
-            </div>
-            <div class="mixer-row">
-              <label for="mic2Delay">Delay (ms)</label>
-              <input id="mic2Delay" type="range" min="0" max="500" value="0" step="5">
-              <span id="mic2DelayVal" class="val">0</span>
-            </div>
-            <div class="mixer-row checkbox-row">
-              <label><input type="checkbox" id="mic2Mute"> Stumm</label>
-            </div>
-          </div>
-        </div>
-
-        <div class="mixer-row">
-          <label for="masterMicGain">Mikro-Master</label>
-          <input id="masterMicGain" type="range" min="0" max="200" value="100">
-          <span id="masterMicGainVal" class="val">100</span>
-        </div>
-
-        <p id="micStatus" class="hint">Mikrofone noch nicht aktiviert.</p>
-      </div>
-
-    </section>
   </main>
 
   <footer class="statusbar">
@@ -206,6 +123,109 @@
     <span class="sep">·</span>
     <span id="audioStatus">Audio-Engine: inaktiv</span>
   </footer>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- SETTINGS MODAL (Mixer + API-Key) -->
+<div id="settingsModal" class="modal hidden">
+  <div class="modal-content">
+    <button id="btnSettingsClose" class="btn ghost modal-close">✕</button>
+    <h2>Einstellungen</h2>
+
+    <div class="mixer-group">
+      <div class="mixer-row head">
+        <span>YouTube-API-Key</span>
+      </div>
+      <div id="apiKeyRow" class="video-controls hidden">
+        <input id="apiKeyInput" type="password" placeholder="YouTube Data API Key einfügen…" autocomplete="off">
+        <button id="btnSaveApiKey" class="btn small primary">Speichern</button>
+      </div>
+      <p class="hint">
+        Wird für die Karaoke-Suche benötigt (bleibt nur lokal in diesem Browser gespeichert).
+        <button id="btnApiKeyHelp" type="button" class="link-btn">Wie bekomme ich einen Key?</button>
+        <button id="btnApiKeyChange" type="button" class="link-btn hidden">· Ändern</button>
+      </p>
+    </div>
+
+    <div class="mixer-group">
+      <div class="mixer-row head">
+        <span>Video-Ton</span>
+      </div>
+      <div class="mixer-row">
+        <label for="videoVolume">Lautstärke</label>
+        <input id="videoVolume" type="range" min="0" max="100" value="80">
+        <span id="videoVolumeVal" class="val">80</span>
+      </div>
+      <div class="mixer-row">
+        <label for="videoOffset">Sync-Offset (ms)</label>
+        <input id="videoOffset" type="range" min="-500" max="500" value="0" step="10">
+        <span id="videoOffsetVal" class="val">0</span>
+      </div>
+      <p class="hint">Positiv = Video läuft später (für langsame Mikro-Kette). Negativ = Video läuft früher.</p>
+    </div>
+
+    <div class="mixer-group">
+      <div class="mixer-row head">
+        <span>Mikrofone</span>
+        <button id="btnMicStart" class="btn small primary">Mikros aktivieren</button>
+      </div>
+
+      <div class="mixer-row">
+        <label for="micDeviceSelect">Audiogerät</label>
+        <select id="micDeviceSelect"></select>
+      </div>
+      <div class="mixer-row checkbox-row">
+        <label><input type="checkbox" id="stereoSplit" checked> Stereo-Splitting (SingStar/2-Kanal-USB: L = Mikro 1, R = Mikro 2)</label>
+      </div>
+
+      <div class="mic-columns">
+        <div class="mic-col">
+          <h3>Mikro 1 <span class="ch-tag">L</span></h3>
+          <canvas id="vu1" class="vu-meter" width="220" height="14"></canvas>
+          <div class="mixer-row">
+            <label for="mic1Gain">Lautstärke</label>
+            <input id="mic1Gain" type="range" min="0" max="200" value="100">
+            <span id="mic1GainVal" class="val">100</span>
+          </div>
+          <div class="mixer-row">
+            <label for="mic1Delay">Delay (ms)</label>
+            <input id="mic1Delay" type="range" min="0" max="500" value="0" step="5">
+            <span id="mic1DelayVal" class="val">0</span>
+          </div>
+          <div class="mixer-row checkbox-row">
+            <label><input type="checkbox" id="mic1Mute"> Stumm</label>
+          </div>
+        </div>
+
+        <div class="mic-col">
+          <h3>Mikro 2 <span class="ch-tag">R</span></h3>
+          <canvas id="vu2" class="vu-meter" width="220" height="14"></canvas>
+          <div class="mixer-row">
+            <label for="mic2Gain">Lautstärke</label>
+            <input id="mic2Gain" type="range" min="0" max="200" value="100">
+            <span id="mic2GainVal" class="val">100</span>
+          </div>
+          <div class="mixer-row">
+            <label for="mic2Delay">Delay (ms)</label>
+            <input id="mic2Delay" type="range" min="0" max="500" value="0" step="5">
+            <span id="mic2DelayVal" class="val">0</span>
+          </div>
+          <div class="mixer-row checkbox-row">
+            <label><input type="checkbox" id="mic2Mute"> Stumm</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="mixer-row">
+        <label for="masterMicGain">Mikro-Master</label>
+        <input id="masterMicGain" type="range" min="0" max="200" value="100">
+        <span id="masterMicGainVal" class="val">100</span>
+      </div>
+
+      <p id="micStatus" class="hint">Mikrofone noch nicht aktiviert.</p>
+    </div>
+  </div>
 </div>
 
 <!-- HELP / SINGSTAR MODAL -->
@@ -217,9 +237,9 @@
     <h3>Kurzanleitung</h3>
     <ol>
       <li>YouTube-Link oder Video-ID einfügen und <b>Laden</b> klicken.</li>
-      <li>Auf <b>Mikros aktivieren</b> klicken und im Browser den Mikrofonzugriff erlauben.</li>
+      <li>Oben auf <b>⚙ Einstellungen</b> klicken, dort auf <b>Mikros aktivieren</b> und im Browser den Mikrofonzugriff erlauben.</li>
       <li>Passendes USB-Audiogerät in der Liste auswählen.</li>
-      <li>Lautstärken für Video und Mikro(s) getrennt einstellen.</li>
+      <li>Lautstärken für Video und Mikro(s) getrennt einstellen (ebenfalls in den Einstellungen).</li>
       <li>Falls Gesang/Bild nicht synchron wirken: <b>Sync-Offset</b> bzw. <b>Mikro-Delay</b> in kleinen Schritten anpassen, bis es passt.</li>
     </ol>
 
@@ -298,8 +318,9 @@
       <li>Empfohlen: Den Schlüssel einschränken auf die "YouTube Data API v3" sowie per HTTP-Referrer auf die
         eigene Domain (z.B. <code>https://popesick.github.io/*</code>) – so kann er bei Verlust nicht für
         andere Zwecke missbraucht werden.</li>
-      <li>Den Key im Suchbereich der App einfügen und auf <b>Speichern</b> klicken. Er wird nur lokal im
-        Browser (localStorage) abgelegt und nirgendwo sonst hin übertragen außer direkt an Google beim Suchen.</li>
+      <li>Den Key unter <b>⚙ Einstellungen</b> (oben in der App bzw. über "API-Key verwalten" im Suchbereich)
+        einfügen und auf <b>Speichern</b> klicken. Er wird nur lokal im Browser (localStorage) abgelegt und
+        nirgendwo sonst hin übertragen außer direkt an Google beim Suchen.</li>
     </ol>
     <p class="hint">
       Das kostenlose Kontingent liegt bei 10.000 Einheiten/Tag; eine Suche kostet 100 Einheiten – macht rund

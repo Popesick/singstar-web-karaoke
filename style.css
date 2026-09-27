@@ -251,6 +251,38 @@ html, body {
   border-top: 1px dashed var(--border);
 }
 
+.playlist-panel h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  color: var(--accent-3);
+}
+
+/* Toast (add-to-queue confirmation etc.) */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(16px);
+  background: #150f26;
+  border: 1px solid var(--ok);
+  color: var(--text);
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 .link-btn {
   background: none;
   border: none;
@@ -408,27 +440,22 @@ html, body {
   flex-wrap: wrap;
 }
 
-/* Join mode: a phone opening a ?join=CODE link only sees search + queue */
-body.join-mode .source-tabs,
-body.join-mode .video-wrap,
-body.join-mode #localControls,
-body.join-mode .yt-direct-row,
-body.join-mode .transport-controls,
-body.join-mode .mixer-panel,
+/* Join mode: a phone opening a ?join=CODE link only sees search + queue,
+   everything player/host-specific (the whole video-panel column, mixer/API
+   settings, stage mode) is hidden. */
+body.join-mode .video-panel,
 body.join-mode #btnStage,
+body.join-mode #btnSettings,
+body.join-mode #btnOpenApiKeySettings,
+body.join-mode #settingsModal,
 body.join-mode .statusbar,
 body.join-mode #sessionStartRow,
 body.join-mode #btnQueueNext {
-  /* No player exists on a joined device — advancing playback is a
-     host-only action. */
   display: none !important;
 }
 
 body.join-mode .layout {
   grid-template-columns: 1fr;
-}
-
-body.join-mode .video-panel {
   max-width: 480px;
   margin: 0 auto;
 }
@@ -607,10 +634,17 @@ body.join-mode .video-panel {
 }
 
 /* Stage / fullscreen mode */
-body.stage-mode .mixer-panel,
-body.stage-mode .queue-row,
-body.stage-mode .queue-list,
-body.stage-mode .topbar-actions #btnHelp {
+#btnMenu {
+  display: none;
+}
+
+body.stage-mode #btnMenu {
+  display: inline-flex;
+}
+
+body.stage-mode .playlist-panel,
+body.stage-mode .topbar-actions #btnHelp,
+body.stage-mode .topbar-actions #btnSettings {
   display: none;
 }
 
