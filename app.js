@@ -22,6 +22,17 @@
     btnRestart: document.getElementById('btnRestart'),
     videoPlaceholder: document.getElementById('videoPlaceholder'),
 
+    searchQuery: document.getElementById('searchQuery'),
+    btnSearch: document.getElementById('btnSearch'),
+    apiKeyRow: document.getElementById('apiKeyRow'),
+    apiKeyInput: document.getElementById('apiKeyInput'),
+    btnSaveApiKey: document.getElementById('btnSaveApiKey'),
+    btnApiKeyHelp: document.getElementById('btnApiKeyHelp'),
+    btnApiKeyChange: document.getElementById('btnApiKeyChange'),
+    searchStatus: document.getElementById('searchStatus'),
+    searchResults: document.getElementById('searchResults'),
+    btnSearchMore: document.getElementById('btnSearchMore'),
+
     queueSection: document.getElementById('queueSection'),
     queueUrl: document.getElementById('queueUrl'),
     btnQueueAdd: document.getElementById('btnQueueAdd'),
@@ -341,6 +352,159 @@
     adapter.seekTo(0);
     adapter.play();
   });
+
+  // ---------------------------------------------------------------------
+  // YouTube search (Data API v3) — only ever shows embeddable videos
+  // ---------------------------------------------------------------------
+  let nextPageToken = null;
+  let lastSearchQuery = '';
+
+  function hasApiKey() {
+    return !!settings.youtubeApiKey;
+  }
+
+  function updateApiKeyUi() {
+    const has = hasApiKey();
+    els.apiKeyRow.classList.toggle('hidden', has);
+    els.btnApiKeyChange.classList.toggle('hidden', !has);
+  }
+
+  function decodeHtmlEntities(str) {
+    const txt = document.createElement('textarea');
+    txt.innerHTML = str;
+    return txt.value;
+  }
+
+  els.btnSaveApiKey.addEventListener('click', () => {
+    const key = els.apiKeyInput.value.trim();
+    if (!key) return;
+    settings.youtubeApiKey = key;
+    saveSettings({ youtubeApiKey: key });
+    els.apiKeyInput.value = '';
+    updateApiKeyUi();
+    els.searchStatus.textContent = 'API-Key gespeichert.';
+    els.searchStatus.style.color = 'var(--ok)';
+  });
+
+  els.btnApiKeyChange.addEventListener('click', () => {
+    els.apiKeyRow.classList.remove('hidden');
+    els.btnApiKeyChange.classList.add('hidden');
+  });
+
+  els.btnApiKeyHelp.addEventListener('click', () => {
+    els.helpModal.classList.remove('hidden');
+    const target = document.getElementById('help-api-key');
+    if (target) target.scrollIntoView({ block: 'start' });
+  });
+
+  function renderSearchResults(items) {
+    items.forEach((item) => {
+      const videoId = item.id && item.id.videoId;
+      if (!videoId) return;
+      const thumbs = item.snippet.thumbnails || {};
+      const thumbUrl = (thumbs.medium || thumbs.default || {}).url || '';
+
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'search-result';
+
+      const img = document.createElement('img');
+      img.src = thumbUrl;
+      img.alt = '';
+      img.loading = 'lazy';
+
+      const titleEl = document.createElement('span');
+      titleEl.className = 'sr-title';
+      titleEl.textContent = decodeHtmlEntities(item.snippet.title || '');
+
+      const channelEl = document.createElement('span');
+      channelEl.className = 'sr-channel';
+      channelEl.textContent = decodeHtmlEntities(item.snippet.channelTitle || '');
+
+      card.appendChild(img);
+      card.appendChild(titleEl);
+      card.appendChild(channelEl);
+
+      card.addEventListener('click', () => {
+        els.videoUrl.value = videoId;
+        loadVideo(videoId);
+      });
+
+      els.searchResults.appendChild(card);
+    });
+  }
+
+  async function runSearch(query, pageToken) {
+    if (!hasApiKey()) {
+      els.searchStatus.textContent = 'Bitte zuerst einen YouTube-API-Key hinterlegen (siehe unten).';
+      els.searchStatus.style.color = 'var(--danger)';
+      els.apiKeyRow.classList.remove('hidden');
+      return;
+    }
+
+    els.searchStatus.textContent = 'Suche läuft…';
+    els.searchStatus.style.color = 'var(--text-dim)';
+    els.btnSearch.disabled = true;
+    els.btnSearchMore.disabled = true;
+
+    try {
+      const params = new URLSearchParams({
+        part: 'snippet',
+        q: query,
+        type: 'video',
+        maxResults: '12',
+        // The API's own filters — only videos that can actually be embedded
+        // and played outside youtube.com ever show up in the results.
+        videoEmbeddable: 'true',
+        videoSyndicated: 'true',
+        safeSearch: 'moderate',
+        key: settings.youtubeApiKey,
+      });
+      if (pageToken) params.set('pageToken', pageToken);
+
+      const resp = await fetch(`https://www.googleapis.com/youtube/v3/search?${params.toString()}`);
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error((data && data.error && data.error.message) || `HTTP ${resp.status}`);
+      }
+
+      if (!pageToken) els.searchResults.innerHTML = '';
+      renderSearchResults(data.items || []);
+      nextPageToken = data.nextPageToken || null;
+      els.btnSearchMore.classList.toggle('hidden', !nextPageToken);
+
+      const totalShown = els.searchResults.children.length;
+      if (totalShown === 0) {
+        els.searchStatus.textContent = 'Keine einbettbaren Videos gefunden. Anderen Suchbegriff versuchen.';
+        els.searchStatus.style.color = 'var(--text-dim)';
+      } else {
+        els.searchStatus.textContent = `${totalShown} einbettbare(s) Video(s) gefunden.`;
+        els.searchStatus.style.color = 'var(--ok)';
+      }
+    } catch (err) {
+      console.error(err);
+      els.searchStatus.textContent = 'Fehler bei der Suche: ' + err.message;
+      els.searchStatus.style.color = 'var(--danger)';
+    } finally {
+      els.btnSearch.disabled = false;
+      els.btnSearchMore.disabled = false;
+    }
+  }
+
+  els.btnSearch.addEventListener('click', () => {
+    const q = els.searchQuery.value.trim();
+    if (!q) return;
+    lastSearchQuery = q;
+    runSearch(q, null);
+  });
+  els.searchQuery.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') els.btnSearch.click();
+  });
+  els.btnSearchMore.addEventListener('click', () => {
+    if (nextPageToken) runSearch(lastSearchQuery, nextPageToken);
+  });
+
+  updateApiKeyUi();
 
   // ---------------------------------------------------------------------
   // Queue (YouTube only)

@@ -42,9 +42,34 @@
         </div>
       </div>
 
-      <div id="youtubeControls" class="video-controls">
-        <input id="videoUrl" type="text" placeholder="YouTube-Link oder Video-ID einfügen…" autocomplete="off">
-        <button id="btnLoad" class="btn primary">Laden</button>
+      <div id="youtubeControls">
+        <div class="video-controls">
+          <input id="videoUrl" type="text" placeholder="YouTube-Link oder Video-ID einfügen…" autocomplete="off">
+          <button id="btnLoad" class="btn primary">Laden</button>
+        </div>
+
+        <div class="search-panel">
+          <div class="video-controls">
+            <input id="searchQuery" type="text" placeholder="Karaoke-Song suchen, z.B. „Bohemian Rhapsody Karaoke"…" autocomplete="off">
+            <button id="btnSearch" class="btn primary">🔍 Suchen</button>
+          </div>
+
+          <div id="apiKeyRow" class="video-controls hidden">
+            <input id="apiKeyInput" type="password" placeholder="YouTube Data API Key einfügen…" autocomplete="off">
+            <button id="btnSaveApiKey" class="btn small primary">Speichern</button>
+          </div>
+
+          <p class="hint">
+            Die Suche nutzt die offizielle YouTube Data API und zeigt nur Videos, die sich einbetten lassen.
+            Dafür wird ein eigener, kostenloser API-Key benötigt (bleibt nur lokal in diesem Browser gespeichert).
+            <button id="btnApiKeyHelp" type="button" class="link-btn">Wie bekomme ich einen Key?</button>
+            <button id="btnApiKeyChange" type="button" class="link-btn hidden">· API-Key ändern</button>
+          </p>
+
+          <p id="searchStatus" class="hint"></p>
+          <div id="searchResults" class="search-results"></div>
+          <button id="btnSearchMore" class="btn small hidden">Mehr laden</button>
+        </div>
       </div>
 
       <div id="localControls" class="video-controls hidden">
@@ -210,6 +235,30 @@
         sich nicht umgehen – in diesem Fall den Modus <b>Lokale Datei</b> mit einer legal vorliegenden
         Videodatei desselben Songs nutzen.</li>
     </ul>
+
+    <h3 id="help-api-key">Karaoke-Suche &amp; YouTube-API-Key</h3>
+    <p>
+      Über das Suchfeld im YouTube-Modus lässt sich direkt nach Karaoke-Videos suchen. Die Suche läuft über
+      die offizielle <b>YouTube Data API v3</b> mit dem Parameter <code>videoEmbeddable=true</code> (und
+      <code>videoSyndicated=true</code>) – dadurch werden von vornherein nur Videos angezeigt, die sich extern
+      einbetten und abspielen lassen. Das genaue Problem aus der Kurzanleitung ("Video nicht verfügbar –
+      Wiedergabe auf anderen Websites deaktiviert") taucht in den Suchergebnissen also gar nicht erst auf.
+    </p>
+    <p>Dafür wird ein <b>eigener, kostenloser</b> API-Key benötigt:</p>
+    <ol>
+      <li><a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a> öffnen und ein (neues) Projekt auswählen.</li>
+      <li>Unter <b>APIs &amp; Dienste → Bibliothek</b> nach "YouTube Data API v3" suchen und aktivieren.</li>
+      <li>Unter <b>APIs &amp; Dienste → Anmeldedaten</b> einen neuen <b>API-Schlüssel</b> erstellen.</li>
+      <li>Empfohlen: Den Schlüssel einschränken auf die "YouTube Data API v3" sowie per HTTP-Referrer auf die
+        eigene Domain (z.B. <code>https://popesick.github.io/*</code>) – so kann er bei Verlust nicht für
+        andere Zwecke missbraucht werden.</li>
+      <li>Den Key im Suchbereich der App einfügen und auf <b>Speichern</b> klicken. Er wird nur lokal im
+        Browser (localStorage) abgelegt und nirgendwo sonst hin übertragen außer direkt an Google beim Suchen.</li>
+    </ol>
+    <p class="hint">
+      Das kostenlose Kontingent liegt bei 10.000 Einheiten/Tag; eine Suche kostet 100 Einheiten – macht rund
+      100 Suchanfragen pro Tag, bevor Google die Anfrage ablehnt.
+    </p>
 
     <h3>Modus "Lokale Datei"</h3>
     <p>

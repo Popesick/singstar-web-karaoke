@@ -10,6 +10,9 @@ client-seitig, kein Server/Backend nötig.
 ## Features
 
 - YouTube-Video per Link oder Video-ID laden, Play/Pause/Neustart, einfache Warteliste für den nächsten Song
+- **Karaoke-Suche** direkt in der App über die offizielle YouTube Data API v3 (eigener, kostenloser API-Key
+  nötig) – zeigt dank `videoEmbeddable`/`videoSyndicated`-Filter von vornherein nur Videos, die sich auch
+  wirklich einbetten und abspielen lassen
 - **Alternativ: lokale Videodatei** (MP4/WebM/…) direkt abspielen – nützlich, wenn ein YouTube-Video das
   Einbetten nicht erlaubt, oder für eigene Karaoke-Videos. Der Ton läuft dabei sogar echt über die
   Web-Audio-Engine (keine Cross-Origin-Einschränkung wie bei YouTube)
