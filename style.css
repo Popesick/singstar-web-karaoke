@@ -350,7 +350,31 @@ html, body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+}
+
+.session-qr {
+  width: 128px;
+  height: 128px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  padding: 6px;
+  box-sizing: border-box;
+}
+
+.session-qr img,
+.session-qr canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.session-code-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .session-code-box {

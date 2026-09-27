@@ -98,16 +98,19 @@
         </div>
         <div id="sessionActiveRow" class="hidden">
           <div class="session-code-row">
-            <div class="session-code-box">
-              <span class="session-label">Code</span>
-              <span id="sessionCode" class="session-code">------</span>
-            </div>
-            <div class="session-actions">
-              <button id="btnCopyLink" class="btn small">Link kopieren/teilen</button>
-              <button id="btnLeaveSession" class="btn small ghost">Verbindung trennen</button>
+            <div id="sessionQr" class="session-qr"></div>
+            <div class="session-code-col">
+              <div class="session-code-box">
+                <span class="session-label">Code</span>
+                <span id="sessionCode" class="session-code">------</span>
+              </div>
+              <div class="session-actions">
+                <button id="btnCopyLink" class="btn small">Link kopieren/teilen</button>
+                <button id="btnLeaveSession" class="btn small ghost">Verbindung trennen</button>
+              </div>
             </div>
           </div>
-          <p class="hint">Andere öffnen den Link bzw. geben den Code ein und können Songs zur gemeinsamen Warteliste hinzufügen.</p>
+          <p class="hint">QR-Code scannen, Link öffnen oder Code eingeben – andere können dann Songs zur gemeinsamen Warteliste hinzufügen.</p>
         </div>
         <p id="sessionStatus" class="hint"></p>
       </div>
@@ -319,6 +322,7 @@
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

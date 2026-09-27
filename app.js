@@ -37,6 +37,7 @@
     btnSessionStart: document.getElementById('btnSessionStart'),
     sessionActiveRow: document.getElementById('sessionActiveRow'),
     sessionCode: document.getElementById('sessionCode'),
+    sessionQr: document.getElementById('sessionQr'),
     btnCopyLink: document.getElementById('btnCopyLink'),
     btnLeaveSession: document.getElementById('btnLeaveSession'),
     sessionStatus: document.getElementById('sessionStatus'),
@@ -621,10 +622,28 @@
     renderQueue();
   }
 
+  function getJoinUrl() {
+    return `${location.origin}${location.pathname}?join=${roomCode}`;
+  }
+
+  function renderSessionQr() {
+    if (!els.sessionQr) return;
+    els.sessionQr.innerHTML = '';
+    if (typeof QRCode === 'undefined') return; // CDN blocked/offline — code/link still work
+    new QRCode(els.sessionQr, {
+      text: getJoinUrl(),
+      width: 116,
+      height: 116,
+      colorDark: '#0a0512',
+      colorLight: '#ffffff',
+    });
+  }
+
   function enterActiveSessionUi() {
     els.sessionStartRow.classList.add('hidden');
     els.sessionActiveRow.classList.remove('hidden');
     els.sessionCode.textContent = roomCode;
+    renderSessionQr();
   }
 
   async function fetchRoomState() {
@@ -757,7 +776,7 @@
   els.btnSessionStart.addEventListener('click', startSession);
   els.btnLeaveSession.addEventListener('click', leaveSession);
   els.btnCopyLink.addEventListener('click', async () => {
-    const url = `${location.origin}${location.pathname}?join=${roomCode}`;
+    const url = getJoinUrl();
     try {
       if (navigator.share) {
         await navigator.share({ title: 'SingStar Web Karaoke – Session beitreten', url });

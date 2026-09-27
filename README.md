@@ -25,8 +25,9 @@ client-seitig, kein Server/Backend nötig.
 - Einstellungen (Lautstärken, Delays, gewähltes Gerät) werden im Browser (localStorage) gemerkt
 - Bühnenmodus/Vollbild für die Party
 - **Gemeinsame Session**: Über einen kleinen Cloudflare Worker (Durable Object pro Session) lässt sich eine
-  geteilte Warteliste öffnen – andere Geräte (z.B. Gäste-Handys) rufen einen Link/Code auf und können Songs
-  zur selben Warteliste hinzufügen, inklusive automatisch geteiltem YouTube-API-Key. Ein Gerät, das über den
+  geteilte Warteliste öffnen – andere Geräte (z.B. Gäste-Handys) scannen einen QR-Code, öffnen einen Link
+  oder geben den Code ein und können Songs zur selben Warteliste hinzufügen, inklusive automatisch geteiltem
+  YouTube-API-Key. Ein Gerät, das über den
   Link beitritt, bekommt automatisch eine schlanke Mobile-Ansicht ohne Player/Mixer, nur Suche + Warteliste
 
 ## Nutzung
