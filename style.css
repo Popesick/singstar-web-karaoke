@@ -564,6 +564,16 @@ body.join-mode .layout {
   overflow-y: auto;
 }
 
+.queue-export-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.queue-export-row .btn {
+  flex: 1;
+}
+
 .queue-list li {
   display: flex;
   justify-content: space-between;

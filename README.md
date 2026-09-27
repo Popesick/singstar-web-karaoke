@@ -9,7 +9,9 @@ client-seitig, kein Server/Backend nötig.
 
 ## Features
 
-- YouTube-Video per Link oder Video-ID laden, Play/Pause/Neustart, einfache Warteliste für den nächsten Song
+- YouTube-Video per Link oder Video-ID laden, Play/Pause/Neustart, einfache Warteliste für den nächsten Song.
+  Songs bleiben optional in der Liste statt beim Abspielen zu verschwinden (Einstellungen → Warteliste),
+  lassen sich als Datei exportieren/importieren (z.B. zum Teilen) und werden lokal automatisch gemerkt
 - **Karaoke-Suche** direkt in der App über die offizielle YouTube Data API v3 (eigener, kostenloser API-Key
   nötig) – zeigt dank `videoEmbeddable`/`videoSyndicated`-Filter von vornherein nur Videos, die sich auch
   wirklich einbetten und abspielen lassen

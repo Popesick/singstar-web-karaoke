@@ -64,6 +64,9 @@
     btnQueueAdd: document.getElementById('btnQueueAdd'),
     btnQueueNext: document.getElementById('btnQueueNext'),
     queueList: document.getElementById('queueList'),
+    btnQueueExport: document.getElementById('btnQueueExport'),
+    queueImportInput: document.getElementById('queueImportInput'),
+    clearPlayedFromQueue: document.getElementById('clearPlayedFromQueue'),
 
     videoVolume: document.getElementById('videoVolume'),
     videoVolumeVal: document.getElementById('videoVolumeVal'),
@@ -693,6 +696,17 @@
     return `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
+  function persistLocalQueue() {
+    // Only meaningful outside a shared session — while a room is active,
+    // its Durable Object is the source of truth and gets polled back in
+    // anyway; local-only items (source 'local', a File this browser holds)
+    // can't be serialized to localStorage in any useful way.
+    if (roomCode) return;
+    const persistable = queue.filter((it) => it.source !== 'local')
+      .map((it) => ({ videoId: it.videoId, title: it.title, addedBy: it.addedBy || '' }));
+    saveSettings({ localQueue: persistable });
+  }
+
   function renderQueue() {
     els.queueList.innerHTML = '';
     queue.forEach((item, idx) => {
@@ -713,9 +727,10 @@
       els.queueList.appendChild(li);
     });
     els.btnQueueNext.disabled = queue.length === 0;
+    persistLocalQueue();
   }
 
-  function playNextInQueue() {
+  async function playNextInQueue() {
     if (queue.length === 0) return;
     const next = queue.shift();
     renderQueue();
@@ -728,7 +743,26 @@
         onLoaded: () => setTimeout(() => player && player.playVideo && player.playVideo(), 200),
       });
     }
-    if (roomCode && next.source !== 'local') removeQueueItemFromRoom(next.id);
+
+    const shouldClear = els.clearPlayedFromQueue ? els.clearPlayedFromQueue.checked : true;
+    if (next.source === 'local') {
+      if (!shouldClear) { queue.push(next); renderQueue(); }
+      return; // local-file items never touch the room
+    }
+    if (roomCode) {
+      if (shouldClear) {
+        removeQueueItemFromRoom(next.id);
+      } else {
+        // No "reorder" endpoint on the room API — remove + re-add lands it
+        // at the back, reusing the existing add/remove round-trip instead
+        // of a new one.
+        await removeQueueItemFromRoom(next.id);
+        await pushQueueItemToRoom({ videoId: next.videoId, title: next.title, addedBy: next.addedBy || '' });
+      }
+    } else if (!shouldClear) {
+      queue.push(next);
+      renderQueue();
+    }
   }
 
   async function addToQueue(idOrUrl, titleOverride) {
@@ -1680,15 +1714,79 @@
     if (settings.mic1Mute !== undefined) els.mic1Mute.checked = settings.mic1Mute;
     if (settings.mic2Mute !== undefined) els.mic2Mute.checked = settings.mic2Mute;
     if (settings.stereoSplit !== undefined) els.stereoSplit.checked = settings.stereoSplit;
+    if (settings.clearPlayedFromQueue !== undefined) els.clearPlayedFromQueue.checked = settings.clearPlayedFromQueue;
   }
 
+  els.clearPlayedFromQueue.addEventListener('change', () => {
+    saveSettings({ clearPlayedFromQueue: els.clearPlayedFromQueue.checked });
+  });
+
+  function exportQueue() {
+    const exportable = queue.filter((it) => it.source !== 'local')
+      .map((it) => ({ videoId: it.videoId, title: it.title }));
+    const localCount = queue.length - exportable.length;
+    if (exportable.length === 0) {
+      showToast('Warteliste ist leer (lokale Dateien lassen sich nicht exportieren).', 'error');
+      return;
+    }
+    const blob = new Blob([JSON.stringify({ items: exportable }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `singstar-warteliste-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast(`✓ ${exportable.length} Song(s) exportiert${localCount > 0 ? ` (${localCount} lokale Datei(en) ausgelassen)` : ''}`);
+  }
+
+  async function importQueueFromFile(file) {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const items = Array.isArray(data) ? data : Array.isArray(data.items) ? data.items : null;
+      if (!items) throw new Error('Unbekanntes Dateiformat');
+      let count = 0;
+      for (const it of items) {
+        const videoId = it && typeof it.videoId === 'string' ? it.videoId : (typeof it === 'string' ? extractVideoId(it) : null);
+        if (!videoId) continue;
+        await addToQueue(videoId, (it && it.title) || videoId);
+        count++;
+      }
+      if (count === 0) throw new Error('Keine gültigen Einträge gefunden');
+      showToast(`✓ ${count} Song(s) importiert`);
+    } catch (err) {
+      showToast('Import fehlgeschlagen: ' + err.message, 'error');
+    }
+  }
+
+  els.btnQueueExport.addEventListener('click', exportQueue);
+  els.queueImportInput.addEventListener('change', () => {
+    const file = els.queueImportInput.files[0];
+    els.queueImportInput.value = '';
+    if (file) importQueueFromFile(file);
+  });
+
   restoreUi();
+
+  const urlJoinCode = getJoinCodeFromUrl();
+
+  // Restore a locally-saved queue (skipped once a room becomes active —
+  // its Durable Object takes over as the source of truth).
+  if (!urlJoinCode && !settings.roomCode && Array.isArray(settings.localQueue)) {
+    settings.localQueue.forEach((it) => {
+      if (it && typeof it.videoId === 'string') {
+        queue.push({ id: makeLocalId(), source: 'youtube', videoId: it.videoId, title: it.title || it.videoId, addedBy: it.addedBy || '' });
+      }
+    });
+  }
+
   renderQueue();
   listAudioInputDevices();
   updatePlaceholder();
   updateTransportButtons();
 
-  const urlJoinCode = getJoinCodeFromUrl();
   if (urlJoinCode) {
     joinRoomFromUrl(urlJoinCode);
   } else if (settings.roomCode) {

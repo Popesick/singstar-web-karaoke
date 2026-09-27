@@ -81,6 +81,11 @@
           <button id="btnQueueNext" class="btn" disabled>Nächster ▶</button>
         </div>
         <ul id="queueList" class="queue-list"></ul>
+        <div class="queue-export-row">
+          <label for="queueImportInput" class="btn small file-btn">Importieren</label>
+          <input id="queueImportInput" type="file" accept="application/json,.json" class="file-input">
+          <button id="btnQueueExport" class="btn small">Exportieren</button>
+        </div>
       </div>
 
       <div class="search-panel">
@@ -162,6 +167,20 @@
   <div class="modal-content">
     <button id="btnSettingsClose" class="btn ghost modal-close">✕</button>
     <h2>Einstellungen</h2>
+
+    <div class="mixer-group">
+      <div class="mixer-row head">
+        <span>Warteliste</span>
+      </div>
+      <div class="mixer-row checkbox-row">
+        <label><input type="checkbox" id="clearPlayedFromQueue" checked> Wiedergabeliste leeren</label>
+      </div>
+      <p class="hint">
+        Angehakt (Standard): Songs verschwinden aus der Warteliste, sobald sie über "Nächster" gestartet
+        werden. Nicht angehakt: Songs bleiben in der Liste und wandern stattdessen ans Ende — praktisch zum
+        Testen/Wiederholen, ohne sie jedes Mal neu hinzufügen zu müssen.
+      </p>
+    </div>
 
     <div class="mixer-group">
       <div class="mixer-row head">
@@ -282,6 +301,21 @@
       <li>Lautstärken für Video und Mikro(s) getrennt einstellen (ebenfalls in den Einstellungen).</li>
       <li>Falls Gesang/Bild nicht synchron wirken: <b>Sync-Offset</b> bzw. <b>Mikro-Delay</b> in kleinen Schritten anpassen, bis es passt.</li>
     </ol>
+
+    <h3>Warteliste verwalten</h3>
+    <p>
+      Standardmäßig verschwindet ein Song aus der Warteliste, sobald er über <b>Nächster</b> gestartet wird.
+      Unter <b>⚙ Einstellungen → Warteliste</b> lässt sich das mit der Checkbox <b>Wiedergabeliste leeren</b>
+      abschalten – dann wandert der gestartete Song stattdessen ans Ende der Liste, statt zu verschwinden
+      (praktisch zum Testen oder für Playlists, die sich wiederholen sollen).
+    </p>
+    <p>
+      Über <b>Exportieren</b> unter der Warteliste lässt sich die aktuelle Liste als Datei speichern (z.B. um
+      sie mit anderen zu teilen oder für später aufzuheben), über <b>Importieren</b> wieder einladen – die
+      importierten Songs werden zur aktuellen Liste hinzugefügt. Zusätzlich merkt sich die App die Warteliste
+      automatisch im Browser (localStorage), solange keine geteilte Session aktiv ist – ein Neuladen der Seite
+      verliert sie also nicht von selbst.
+    </p>
 
     <h3>Gemeinsame Session (Songs vom Handy hinzufügen)</h3>
     <p>
