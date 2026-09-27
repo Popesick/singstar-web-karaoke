@@ -55,6 +55,8 @@
     phoneMicActive: document.getElementById('phoneMicActive'),
     phoneMicIcon: document.getElementById('phoneMicIcon'),
     phoneMicVu: document.getElementById('phoneMicVu'),
+    phoneMicInputGain: document.getElementById('phoneMicInputGain'),
+    phoneMicInputGainVal: document.getElementById('phoneMicInputGainVal'),
     phoneMicsGroup: document.getElementById('phoneMicsGroup'),
     phoneMicsHint: document.getElementById('phoneMicsHint'),
     phoneMicsList: document.getElementById('phoneMicsList'),
@@ -1283,8 +1285,15 @@
       // Ask the browser to keep as little playout buffer as it can get
       // away with — trades a bit of resilience against network jitter for
       // lower end-to-end latency, a reasonable trade on a home/party WiFi.
-      // Chrome-only and experimental, so feature-detected.
-      event.receiver && 'playoutDelayHint' in event.receiver && (event.receiver.playoutDelayHint = 0);
+      // Both are experimental/Chrome-specific APIs (older playoutDelayHint,
+      // newer jitterBufferTarget), so both are feature-detected and set;
+      // neither skips the adaptive ramp-up a fresh jitter buffer does while
+      // it sizes itself to the connection, which is the main source of the
+      // higher initial latency that settles down after a few seconds.
+      if (event.receiver) {
+        if ('playoutDelayHint' in event.receiver) event.receiver.playoutDelayHint = 0;
+        if ('jitterBufferTarget' in event.receiver) event.receiver.jitterBufferTarget = 0;
+      }
 
       const source = ctx.createMediaStreamSource(stream);
       const gain = ctx.createGain();
@@ -1506,19 +1515,29 @@
     els.phoneMicStatus.textContent = 'Verbinde…';
     els.phoneMicStatus.style.color = 'var(--text-dim)';
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const rawStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
 
-      // Local monitoring only — connected to an analyser so the phone can
-      // see its own mic level, never to a destination (would echo back the
-      // singer's own voice through the phone's speaker).
-      const monitorCtx = ensureAudioCtx();
-      const monitorSource = monitorCtx.createMediaStreamSource(stream);
-      const monitorAnalyser = monitorCtx.createAnalyser();
+      // Route the mic through Web Audio before it ever reaches the peer
+      // connection, so the input-gain slider actually changes what gets
+      // sent (not just what plays back at the host) — useful both against
+      // clipping on a loud voice and, turned down, against feeding a
+      // feedback loop in the first place. The analyser taps the same
+      // post-gain signal, so the phone's own VU meter reflects what's
+      // actually being transmitted rather than the raw, unadjusted mic.
+      const ctx = ensureAudioCtx();
+      const inputSource = ctx.createMediaStreamSource(rawStream);
+      const inputGain = ctx.createGain();
+      inputGain.gain.value = Number(els.phoneMicInputGain.value) / 100;
+      const sendDest = ctx.createMediaStreamDestination();
+      const monitorAnalyser = ctx.createAnalyser();
       monitorAnalyser.fftSize = 256;
       monitorAnalyser.smoothingTimeConstant = 0.6;
-      monitorSource.connect(monitorAnalyser);
+      inputSource.connect(inputGain);
+      inputGain.connect(sendDest);
+      inputGain.connect(monitorAnalyser); // monitoring only, never to ctx.destination — would echo through the phone's own speaker
+      const sendStream = sendDest.stream;
 
       const joinResp = await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics/join`, { method: 'POST' });
       const joinData = await joinResp.json();
@@ -1526,7 +1545,7 @@
       const slot = joinData.slot;
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      sendStream.getTracks().forEach((t) => pc.addTrack(t, sendStream));
 
       pc.onicecandidate = (e) => {
         if (!e.candidate) return;
@@ -1580,7 +1599,7 @@
         }
       }, 1200);
 
-      phoneSender = { pc, stream, slot, statusTimer, analyser: monitorAnalyser };
+      phoneSender = { pc, rawStream, sendStream, slot, statusTimer, analyser: monitorAnalyser, inputGain };
       els.btnUsePhoneAsMic.classList.add('hidden');
       els.phoneMicActive.classList.remove('hidden');
       startVuLoop();
@@ -1591,12 +1610,18 @@
     }
   }
 
+  els.phoneMicInputGain.addEventListener('input', () => {
+    const v = Number(els.phoneMicInputGain.value);
+    els.phoneMicInputGainVal.textContent = String(v);
+    if (phoneSender && phoneSender.inputGain) phoneSender.inputGain.gain.value = v / 100;
+  });
+
   function stopUsingPhoneAsMic(notifyServer) {
     if (!phoneSender) return;
-    const { pc, stream, slot, statusTimer } = phoneSender;
+    const { pc, rawStream, statusTimer, slot } = phoneSender;
     clearInterval(statusTimer);
     try { pc.close(); } catch (e) { /* noop */ }
-    stream.getTracks().forEach((t) => t.stop());
+    rawStream.getTracks().forEach((t) => t.stop());
     if (notifyServer !== false && roomCode) {
       fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics/${slot}/leave`, { method: 'POST' }).catch(() => {});
     }

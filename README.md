@@ -33,10 +33,12 @@ client-seitig, kein Server/Backend nötig.
   oder geben den Code ein und können Songs zur selben Warteliste hinzufügen, inklusive automatisch geteiltem
   YouTube-API-Key. Ein Gerät, das über den
   Link beitritt, bekommt automatisch eine schlanke Mobile-Ansicht ohne Player/Mixer, nur Suche + Warteliste
-- **Handy als drahtloses Mikrofon**: Innerhalb einer Session per WebRTC (Browser-zu-Browser-Audio in
-  Echtzeit, ~20–60 ms Latenz, `playoutDelayHint`/`latencyHint: 'interactive'` für minimale Pufferung) den Ton
-  eines Geräts direkt zur Hauptsession übertragen und über den Video-Sound legen – bis zu 4 Geräte
-  gleichzeitig, jedes mit eigener Lautstärke/Delay/Stumm/VU-Meter unter Einstellungen → Externe Mikrofone.
+- **Handy als drahtloses Mikrofon**: Auf beitretenden Geräten (nicht auf dem Hauptgerät, das singt ja bereits
+  über eigene Mikros) per WebRTC (Browser-zu-Browser-Audio in Echtzeit, ~20–60 ms Latenz,
+  `playoutDelayHint`/`jitterBufferTarget`/`latencyHint: 'interactive'` für minimale Pufferung) den Ton eines
+  Geräts direkt zur Hauptsession übertragen und über den Video-Sound legen – bis zu 4 Geräte gleichzeitig,
+  jedes mit eigener Lautstärke/Delay/Stumm/VU-Meter unter Einstellungen → Externe Mikrofone, plus regelbarem
+  Eingangspegel direkt auf dem sendenden Gerät.
   Eigenes Pegel-Meter + leuchtendes Mikro-Symbol auf dem sendenden Gerät zur Fehlersuche ("kommt überhaupt Ton
   am Mikro an?"). Gegen akustische Rückkopplung (Handy-Mikro hört die Lautsprecher der Hauptsession):
   niedrigerer Standard-Pegel (70%) plus ein Begrenzer (Limiter) pro Handy-Mikro-Kanal

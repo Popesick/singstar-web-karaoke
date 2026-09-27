@@ -139,6 +139,15 @@
               <canvas id="phoneMicVu" class="vu-meter" width="260" height="16"></canvas>
               <p class="hint">Eigener Mikrofon-Pegel — bewegt sich der Balken beim Sprechen/Singen nicht, wird dein Ton
                 nicht erfasst (Berechtigung prüfen bzw. richtiges Mikro am Gerät ausgewählt?).</p>
+
+              <div class="phone-mic-gain-row">
+                <label for="phoneMicInputGain">Eingangspegel</label>
+                <input id="phoneMicInputGain" type="range" min="0" max="200" value="100">
+                <span id="phoneMicInputGainVal" class="val">100</span>
+              </div>
+              <p class="hint">Regelt, wie laut dein Mikrofon bereits an der Quelle gesendet wird — hilft gegen
+                Übersteuern bei lauter Stimme oder gegen Rückkopplung (leiser stellen).</p>
+
               <button id="btnStopPhoneAsMic" class="btn ghost">Mikro trennen</button>
             </div>
 
@@ -342,11 +351,15 @@
 
     <h3>Handy als drahtloses Mikrofon</h3>
     <p>
-      Innerhalb einer laufenden Session zeigt jedes Gerät einen Button <b>🎤 Als Mikro verwenden</b>: Das
-      Gerät nimmt seinen eigenen Mikrofon-Ton auf und überträgt ihn per <b>WebRTC in Echtzeit</b> (typisch
-      20–60 ms Latenz) direkt zur Hauptsession, wo er über den Video-Sound gelegt wird – bis zu 4 Geräte
-      gleichzeitig. Die Hauptsession regelt Lautstärke, Verzögerung (Delay) und Stumm für jedes Handy-Mikro
-      einzeln unter <b>⚙ Einstellungen → Externe Mikrofone (Handys)</b>, inklusive VU-Meter.
+      Auf jedem Gerät, das einer laufenden Session <b>beitritt</b> (also nicht auf dem Hauptgerät selbst – das
+      singt ja bereits über seine eigenen angeschlossenen Mikros), erscheint der Button
+      <b>🎤 Als Mikro verwenden</b>: Das Gerät nimmt seinen eigenen Mikrofon-Ton auf und überträgt ihn per
+      <b>WebRTC in Echtzeit</b> (typisch 20–60 ms Latenz) direkt zur Hauptsession, wo er über den Video-Sound
+      gelegt wird – bis zu 4 Geräte gleichzeitig. Die Hauptsession regelt Lautstärke, Verzögerung (Delay) und
+      Stumm für jedes Handy-Mikro einzeln unter <b>⚙ Einstellungen → Externe Mikrofone (Handys)</b>, inklusive
+      VU-Meter. Zusätzlich lässt sich direkt auf dem sendenden Gerät der <b>Eingangspegel</b> regeln – schon
+      an der Quelle leiser stellen hilft sowohl gegen Übersteuern bei lauter Stimme als auch gegen
+      Rückkopplung.
     </p>
     <p>
       Beide Seiten zeigen einen eigenen Pegel-Balken zur Fehlersuche: Auf dem Handy selbst direkt unter dem
@@ -363,21 +376,24 @@
       verfügbar) gibt den Platz wieder frei.
     </p>
 
-    <h3>Rückkopplung/Pfeifen bei Handy-Mikros</h3>
+    <h3>Rückkopplung/Pfeifen/Hall bei Handy-Mikros</h3>
     <p>
       Wenn das Handy-Mikro in der Nähe der Lautsprecher der Hauptsession steht, kann es passieren, dass es
       deren Ausgabe (Video + bereits gemischte Stimmen) wieder mit aufnimmt – das geht zurück in den Mix, wird
       erneut abgespielt, erneut aufgenommen usw. Das ist eine akustische Rückkopplung (wie bei jeder PA-Anlage)
       und lässt sich nicht rein softwareseitig auf null bringen, wenn Mikro und Lautsprecher im selben Raum
-      offen sind. Die App entschärft das an zwei Stellen: Handy-Mikros starten standardmäßig mit einer
-      niedrigeren Lautstärke (70% statt 100%) und jeder Handy-Mikro-Kanal hat einen Begrenzer (Limiter), der
-      ein Aufschaukeln kappt, statt es unkontrolliert lauter werden zu lassen.
+      offen sind. Je nach Lautstärke/Abstand äußert sich das entweder als lautes Pfeifen oder – bei niedrigerer
+      Schleifenverstärkung – als ein hallartiges, abklingendes Echo der eigenen Stimme: Beides ist dasselbe
+      Phänomen, nur unterschiedlich stark. Die App entschärft das an drei Stellen: Handy-Mikros starten
+      standardmäßig mit einer niedrigeren Lautstärke (70% statt 100%), jeder Handy-Mikro-Kanal hat einen
+      Begrenzer (Limiter), der ein Aufschaukeln kappt statt es unkontrolliert lauter werden zu lassen, und auf
+      dem sendenden Gerät selbst lässt sich der Eingangspegel direkt an der Quelle absenken.
     </p>
     <p class="hint">
-      Hilft das nicht ausreichend: Lautstärke des betroffenen Handy-Mikros in den Einstellungen weiter
-      absenken, das Handy weiter von den Lautsprechern wegbewegen bzw. die Lautsprecher-Lautstärke insgesamt
-      reduzieren, oder für die singende Person Kopfhörer statt offener Lautsprecher zum Mithören der
-      Hauptsession verwenden.
+      Hilft das nicht ausreichend: Eingangspegel auf dem Handy selbst und/oder Lautstärke des betroffenen
+      Mikros in den Einstellungen der Hauptsession weiter absenken, das Handy weiter von den Lautsprechern
+      wegbewegen bzw. die Lautsprecher-Lautstärke insgesamt reduzieren, oder für die singende Person Kopfhörer
+      statt offener Lautsprecher zum Mithören der Hauptsession verwenden.
     </p>
 
     <h3>Original SingStar-USB-Mikrofone (PS2)</h3>

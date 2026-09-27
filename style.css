@@ -419,9 +419,17 @@ html, body {
 }
 
 .phone-mic-row {
+  /* The host already sings through its own connected mics (local USB/
+     SingStar or the device mic) — "use this device as a wireless mic"
+     only makes sense for a device that joined via the session link. */
+  display: none;
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px dashed var(--border);
+}
+
+body.join-mode .phone-mic-row {
+  display: block;
 }
 
 .phone-mic-row .btn {
@@ -458,6 +466,31 @@ html, body {
 
 .phone-mic-active .vu-meter {
   width: 260px;
+}
+
+.phone-mic-gain-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 260px;
+}
+
+.phone-mic-gain-row label {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  flex: 0 0 auto;
+}
+
+.phone-mic-gain-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-2);
+}
+
+.phone-mic-gain-row .val {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  width: 2.5em;
+  text-align: right;
 }
 
 .phone-mic-active .btn {
