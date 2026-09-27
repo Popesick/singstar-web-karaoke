@@ -293,6 +293,42 @@ html, body {
   text-decoration: underline;
 }
 
+.link-btn-danger {
+  color: var(--danger);
+}
+
+.api-key-status {
+  font-size: 0.8rem;
+  color: var(--ok);
+  margin: 0 0 8px;
+}
+
+.search-results-header {
+  display: flex;
+  justify-content: flex-end;
+  margin: 8px 0 -2px;
+}
+
+.player-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px;
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.player-error p {
+  margin: 0;
+  max-width: 420px;
+}
+
 .search-results {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

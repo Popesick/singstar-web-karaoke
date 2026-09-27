@@ -21,15 +21,21 @@
     btnPlayPause: document.getElementById('btnPlayPause'),
     btnRestart: document.getElementById('btnRestart'),
     videoPlaceholder: document.getElementById('videoPlaceholder'),
+    playerErrorBanner: document.getElementById('playerErrorBanner'),
+    btnRetryPlayer: document.getElementById('btnRetryPlayer'),
 
     searchQuery: document.getElementById('searchQuery'),
     btnSearch: document.getElementById('btnSearch'),
+    apiKeyStatus: document.getElementById('apiKeyStatus'),
     apiKeyRow: document.getElementById('apiKeyRow'),
     apiKeyInput: document.getElementById('apiKeyInput'),
     btnSaveApiKey: document.getElementById('btnSaveApiKey'),
     btnApiKeyHelp: document.getElementById('btnApiKeyHelp'),
     btnApiKeyChange: document.getElementById('btnApiKeyChange'),
+    btnApiKeyRemove: document.getElementById('btnApiKeyRemove'),
     searchStatus: document.getElementById('searchStatus'),
+    searchResultsHeader: document.getElementById('searchResultsHeader'),
+    btnSearchClose: document.getElementById('btnSearchClose'),
     searchResults: document.getElementById('searchResults'),
     btnSearchMore: document.getElementById('btnSearchMore'),
 
@@ -302,6 +308,7 @@
 
   function startSyncLoop() {
     stopSyncLoop();
+    let lastCorrectionAt = 0;
     syncTimer = setInterval(() => {
       const adapter = getActiveAdapter();
       if (adapter.getState() !== 'playing') return;
@@ -309,9 +316,13 @@
       const targetSec = syncBaseVideoTime + elapsedSec + videoOffsetMs / 1000;
       const actualSec = adapter.getCurrentTime();
       const drift = targetSec - actualSec;
-      // Only correct on drift beyond ~120ms to avoid stutter from constant seeking.
-      if (Math.abs(drift) > 0.12) {
+      const now = Date.now();
+      // Only correct on drift beyond ~350ms, and at most once every 2s — a
+      // tighter threshold/cooldown caused visible stutter from YouTube
+      // re-buffering on every small, mostly-harmless correction seek.
+      if (Math.abs(drift) > 0.35 && now - lastCorrectionAt > 2000) {
         adapter.seekTo(targetSec);
+        lastCorrectionAt = now;
       }
     }, 500);
   }
@@ -345,9 +356,25 @@
   els.tabYoutube.addEventListener('click', () => setMode('youtube'));
   els.tabLocal.addEventListener('click', () => setMode('local'));
 
+  let lastLoadRequest = null; // { idOrUrl, onLoaded } — used by the "Erneut versuchen" retry button
+
+  function showPlayerError() {
+    els.playerErrorBanner.classList.remove('hidden');
+    els.videoPlaceholder.style.display = 'none';
+  }
+
+  function hidePlayerError() {
+    els.playerErrorBanner.classList.add('hidden');
+    updatePlaceholder();
+  }
+
   function loadVideo(idOrUrl, opts) {
     const options = opts || {};
     const attempt = options.attempt || 0;
+    if (attempt === 0) {
+      lastLoadRequest = { idOrUrl, onLoaded: options.onLoaded };
+      hidePlayerError();
+    }
     const id = extractVideoId(idOrUrl);
     if (!id) {
       alert('Konnte keine gültige YouTube-Video-ID aus der Eingabe lesen.');
@@ -355,19 +382,13 @@
     }
     if (!playerReady) {
       // The YT IFrame API can take a moment after page load to finish
-      // initializing (it fetches extra resources from youtube.com). Retry
-      // quietly for a few seconds before bothering the user with an alert.
-      if (attempt < 16) {
+      // initializing (it fetches extra resources from youtube.com, and on a
+      // slow connection or first cold load that can take longer than a few
+      // seconds). Retry quietly for up to ~8s before showing anything.
+      if (attempt < 40) {
         setTimeout(() => loadVideo(idOrUrl, { attempt: attempt + 1, onLoaded: options.onLoaded }), 200);
       } else {
-        alert(
-          'YouTube-Player konnte nicht geladen werden.\n\n' +
-          'Das liegt fast immer an einem Ad-/Tracking-Blocker im Browser (z.B. uBlock Origin), der das ' +
-          'eingebettete YouTube-Player-Script blockiert – auch wenn youtube.com selbst normal funktioniert, ' +
-          'da Embed-Player oft separat gefiltert werden.\n\n' +
-          'Lösung: Den Blocker für diese Seite deaktivieren bzw. auf die Whitelist setzen, dann die Seite ' +
-          'neu laden.'
-        );
+        showPlayerError();
       }
       return false;
     }
@@ -379,6 +400,11 @@
     if (options.onLoaded) options.onLoaded();
     return true;
   }
+
+  els.btnRetryPlayer.addEventListener('click', () => {
+    hidePlayerError();
+    if (lastLoadRequest) loadVideo(lastLoadRequest.idOrUrl, { onLoaded: lastLoadRequest.onLoaded });
+  });
 
   els.btnLoad.addEventListener('click', () => loadVideo(els.videoUrl.value));
   els.videoUrl.addEventListener('keydown', (e) => {
@@ -413,6 +439,8 @@
     const has = hasApiKey();
     els.apiKeyRow.classList.toggle('hidden', has);
     els.btnApiKeyChange.classList.toggle('hidden', !has);
+    els.btnApiKeyRemove.classList.toggle('hidden', !has);
+    els.apiKeyStatus.classList.toggle('hidden', !has);
   }
 
   function decodeHtmlEntities(str) {
@@ -435,6 +463,15 @@
   els.btnApiKeyChange.addEventListener('click', () => {
     els.apiKeyRow.classList.remove('hidden');
     els.btnApiKeyChange.classList.add('hidden');
+  });
+
+  els.btnApiKeyRemove.addEventListener('click', () => {
+    if (!confirm('API-Key wirklich entfernen? Die Karaoke-Suche funktioniert danach nicht mehr, bis ein neuer Key hinterlegt wird.')) return;
+    settings.youtubeApiKey = '';
+    saveSettings({ youtubeApiKey: '' });
+    updateApiKeyUi();
+    els.searchStatus.textContent = 'API-Key entfernt.';
+    els.searchStatus.style.color = 'var(--text-dim)';
   });
 
   els.btnApiKeyHelp.addEventListener('click', () => {
@@ -541,9 +578,13 @@
       if (totalShown === 0) {
         els.searchStatus.textContent = 'Keine einbettbaren Videos gefunden. Anderen Suchbegriff versuchen.';
         els.searchStatus.style.color = 'var(--text-dim)';
+        els.searchResultsHeader.classList.add('hidden');
+        els.searchResults.classList.add('hidden');
       } else {
         els.searchStatus.textContent = `${totalShown} einbettbare(s) Video(s) gefunden.`;
         els.searchStatus.style.color = 'var(--ok)';
+        els.searchResultsHeader.classList.remove('hidden');
+        els.searchResults.classList.remove('hidden');
       }
     } catch (err) {
       console.error(err);
@@ -566,6 +607,12 @@
   });
   els.btnSearchMore.addEventListener('click', () => {
     if (nextPageToken) runSearch(lastSearchQuery, nextPageToken);
+  });
+  els.btnSearchClose.addEventListener('click', () => {
+    els.searchResults.classList.add('hidden');
+    els.searchResultsHeader.classList.add('hidden');
+    els.btnSearchMore.classList.add('hidden');
+    els.searchStatus.textContent = '';
   });
 
   updateApiKeyUi();

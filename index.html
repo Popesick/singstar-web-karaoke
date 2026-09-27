@@ -42,6 +42,13 @@
         <div id="videoPlaceholder" class="video-placeholder">
           <p>Kein Video geladen.<br>YouTube-Link/Video-ID einfügen oder eine lokale Videodatei auswählen.</p>
         </div>
+        <div id="playerErrorBanner" class="player-error hidden">
+          <p><b>YouTube-Player konnte nicht geladen werden.</b></p>
+          <p>Meist ein Ad-/Tracking-Blocker, der das YouTube-Embed-Script blockiert (auch wenn youtube.com
+            selbst normal funktioniert). Blocker für diese Seite deaktivieren/whitelisten, dann erneut
+            versuchen.</p>
+          <button id="btnRetryPlayer" class="btn primary small">Erneut versuchen</button>
+        </div>
       </div>
 
       <div id="youtubeControls">
@@ -88,6 +95,9 @@
         </p>
 
         <p id="searchStatus" class="hint"></p>
+        <div id="searchResultsHeader" class="search-results-header hidden">
+          <button id="btnSearchClose" type="button" class="link-btn">✕ Suche schließen</button>
+        </div>
         <div id="searchResults" class="search-results"></div>
         <button id="btnSearchMore" class="btn small hidden">Mehr laden</button>
       </div>
@@ -137,6 +147,7 @@
       <div class="mixer-row head">
         <span>YouTube-API-Key</span>
       </div>
+      <p id="apiKeyStatus" class="api-key-status hidden">✓ API-Key hinzugefügt</p>
       <div id="apiKeyRow" class="video-controls hidden">
         <input id="apiKeyInput" type="password" placeholder="YouTube Data API Key einfügen…" autocomplete="off">
         <button id="btnSaveApiKey" class="btn small primary">Speichern</button>
@@ -145,6 +156,7 @@
         Wird für die Karaoke-Suche benötigt (bleibt nur lokal in diesem Browser gespeichert).
         <button id="btnApiKeyHelp" type="button" class="link-btn">Wie bekomme ich einen Key?</button>
         <button id="btnApiKeyChange" type="button" class="link-btn hidden">· Ändern</button>
+        <button id="btnApiKeyRemove" type="button" class="link-btn link-btn-danger hidden">· API-Key entfernen</button>
       </p>
     </div>
 
