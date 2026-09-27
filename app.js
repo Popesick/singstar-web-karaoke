@@ -360,7 +360,14 @@
       if (attempt < 16) {
         setTimeout(() => loadVideo(idOrUrl, { attempt: attempt + 1, onLoaded: options.onLoaded }), 200);
       } else {
-        alert('YouTube-Player konnte nicht geladen werden (evtl. durch einen Ad-/Script-Blocker blockiert). Bitte Seite neu laden.');
+        alert(
+          'YouTube-Player konnte nicht geladen werden.\n\n' +
+          'Das liegt fast immer an einem Ad-/Tracking-Blocker im Browser (z.B. uBlock Origin), der das ' +
+          'eingebettete YouTube-Player-Script blockiert – auch wenn youtube.com selbst normal funktioniert, ' +
+          'da Embed-Player oft separat gefiltert werden.\n\n' +
+          'Lösung: Den Blocker für diese Seite deaktivieren bzw. auf die Whitelist setzen, dann die Seite ' +
+          'neu laden.'
+        );
       }
       return false;
     }
