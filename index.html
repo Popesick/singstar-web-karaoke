@@ -43,7 +43,7 @@
       </div>
 
       <div id="youtubeControls">
-        <div class="video-controls">
+        <div class="video-controls yt-direct-row">
           <input id="videoUrl" type="text" placeholder="YouTube-Link oder Video-ID einfügen…" autocomplete="off">
           <button id="btnLoad" class="btn primary">Laden</button>
         </div>
@@ -78,7 +78,7 @@
         <span id="localFileName" class="file-name">Keine Datei ausgewählt</span>
       </div>
 
-      <div class="video-controls">
+      <div class="video-controls transport-controls">
         <button id="btnPlayPause" class="btn" disabled>▶ Play</button>
         <button id="btnRestart" class="btn" disabled>⟲ Neustart</button>
       </div>
@@ -90,6 +90,26 @@
           <button id="btnQueueNext" class="btn" disabled>Nächster ▶</button>
         </div>
         <ul id="queueList" class="queue-list"></ul>
+      </div>
+
+      <div id="sessionPanel" class="session-panel">
+        <div id="sessionStartRow">
+          <button id="btnSessionStart" class="btn primary">📱 Session starten (Songs vom Handy hinzufügen)</button>
+        </div>
+        <div id="sessionActiveRow" class="hidden">
+          <div class="session-code-row">
+            <div class="session-code-box">
+              <span class="session-label">Code</span>
+              <span id="sessionCode" class="session-code">------</span>
+            </div>
+            <div class="session-actions">
+              <button id="btnCopyLink" class="btn small">Link kopieren/teilen</button>
+              <button id="btnLeaveSession" class="btn small ghost">Verbindung trennen</button>
+            </div>
+          </div>
+          <p class="hint">Andere öffnen den Link bzw. geben den Code ein und können Songs zur gemeinsamen Warteliste hinzufügen.</p>
+        </div>
+        <p id="sessionStatus" class="hint"></p>
       </div>
     </section>
 
@@ -199,6 +219,29 @@
       <li>Lautstärken für Video und Mikro(s) getrennt einstellen.</li>
       <li>Falls Gesang/Bild nicht synchron wirken: <b>Sync-Offset</b> bzw. <b>Mikro-Delay</b> in kleinen Schritten anpassen, bis es passt.</li>
     </ol>
+
+    <h3>Gemeinsame Session (Songs vom Handy hinzufügen)</h3>
+    <p>
+      Über <b>Session starten</b> lässt sich eine geteilte Warteliste öffnen: Andere Geräte (z.B. Smartphones
+      der Gäste) rufen den angezeigten Link auf oder geben den 6-stelligen Code ein und können darüber Songs
+      zur selben Warteliste hinzufügen – ideal, weil Singen übers Handy-Mikro zwar technisch ginge, den
+      Songtext lesen darauf aber eher unpraktisch ist. Auf einem Gerät, das über den Link beitritt, zeigt die
+      App automatisch eine schlanke Ansicht nur mit Suche/Warteliste, ohne Player und Mixer.
+    </p>
+    <p>
+      Technisch läuft das über einen kleinen Cloudflare Worker mit einer Durable Object pro Session (Code =
+      Name der Durable Object). Alle Geräte fragen den gemeinsamen Zustand alle paar Sekunden ab (Polling,
+      kein WebSocket nötig). Ist zum Zeitpunkt des Session-Starts bereits ein YouTube-API-Key hinterlegt,
+      wird dieser ebenfalls über die Session geteilt, damit auch beitretende Geräte direkt suchen können,
+      ohne selbst einen Key eingeben zu müssen.
+    </p>
+    <p class="hint">
+      Der Session-Code ist die einzige Zugriffskontrolle (wie ein Jackbox-Party-Code) – wer ihn kennt, kann
+      Songs hinzufügen und sieht einen eventuell geteilten API-Key. Für private Runden unter Freunden ist das
+      unkritisch; den Code entsprechend nicht öffentlich teilen. Ein geteilter API-Key sollte wie oben
+      beschrieben per HTTP-Referrer eingeschränkt sein. Sessions laufen nicht automatisch ab; "Verbindung
+      trennen" beendet nur die Teilnahme des eigenen Geräts, nicht die Session selbst.
+    </p>
 
     <h3>Original SingStar-USB-Mikrofone (PS2)</h3>
     <p>

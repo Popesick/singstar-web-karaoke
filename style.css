@@ -308,10 +308,102 @@ html, body {
   color: var(--text-dim);
 }
 
+.sr-add-btn {
+  margin-top: 2px;
+  align-self: flex-start;
+  background: rgba(41, 224, 255, 0.12);
+  border: 1px solid var(--accent-2);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.sr-add-btn:hover {
+  background: rgba(41, 224, 255, 0.25);
+}
+
+.search-result.added {
+  border-color: var(--ok);
+  background: rgba(53, 224, 138, 0.12);
+}
+
 #btnSearchMore {
   display: block;
   width: 100%;
   margin-top: 10px;
+}
+
+/* Shared session panel */
+.session-panel {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+
+#btnSessionStart {
+  width: 100%;
+}
+
+.session-code-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.session-code-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #0f0a1e;
+  border: 1px solid var(--accent-2);
+  border-radius: 10px;
+  padding: 8px 18px;
+}
+
+.session-label {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.session-code {
+  font-family: "Courier New", monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--accent-3);
+}
+
+.session-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Join mode: a phone opening a ?join=CODE link only sees search + queue */
+body.join-mode .source-tabs,
+body.join-mode .video-wrap,
+body.join-mode #localControls,
+body.join-mode .yt-direct-row,
+body.join-mode .transport-controls,
+body.join-mode .mixer-panel,
+body.join-mode #btnStage,
+body.join-mode .statusbar,
+body.join-mode #sessionStartRow {
+  display: none !important;
+}
+
+body.join-mode .layout {
+  grid-template-columns: 1fr;
+}
+
+body.join-mode .video-panel {
+  max-width: 480px;
+  margin: 0 auto;
 }
 
 .queue-list {

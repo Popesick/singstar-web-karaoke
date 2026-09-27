@@ -33,6 +33,14 @@
     searchResults: document.getElementById('searchResults'),
     btnSearchMore: document.getElementById('btnSearchMore'),
 
+    sessionStartRow: document.getElementById('sessionStartRow'),
+    btnSessionStart: document.getElementById('btnSessionStart'),
+    sessionActiveRow: document.getElementById('sessionActiveRow'),
+    sessionCode: document.getElementById('sessionCode'),
+    btnCopyLink: document.getElementById('btnCopyLink'),
+    btnLeaveSession: document.getElementById('btnLeaveSession'),
+    sessionStatus: document.getElementById('sessionStatus'),
+
     queueSection: document.getElementById('queueSection'),
     queueUrl: document.getElementById('queueUrl'),
     btnQueueAdd: document.getElementById('btnQueueAdd'),
@@ -403,6 +411,7 @@
       if (!videoId) return;
       const thumbs = item.snippet.thumbnails || {};
       const thumbUrl = (thumbs.medium || thumbs.default || {}).url || '';
+      const title = decodeHtmlEntities(item.snippet.title || '');
 
       const card = document.createElement('button');
       card.type = 'button';
@@ -415,19 +424,36 @@
 
       const titleEl = document.createElement('span');
       titleEl.className = 'sr-title';
-      titleEl.textContent = decodeHtmlEntities(item.snippet.title || '');
+      titleEl.textContent = title;
 
       const channelEl = document.createElement('span');
       channelEl.className = 'sr-channel';
       channelEl.textContent = decodeHtmlEntities(item.snippet.channelTitle || '');
 
+      const addBtn = document.createElement('span');
+      addBtn.className = 'sr-add-btn';
+      addBtn.textContent = '+ Warteliste';
+      addBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        addToQueue(videoId, title);
+        card.classList.add('added');
+        setTimeout(() => card.classList.remove('added'), 600);
+      });
+
       card.appendChild(img);
       card.appendChild(titleEl);
       card.appendChild(channelEl);
+      card.appendChild(addBtn);
 
       card.addEventListener('click', () => {
-        els.videoUrl.value = videoId;
-        loadVideo(videoId);
+        if (document.body.classList.contains('join-mode')) {
+          addToQueue(videoId, title);
+          card.classList.add('added');
+          setTimeout(() => card.classList.remove('added'), 600);
+        } else {
+          els.videoUrl.value = videoId;
+          loadVideo(videoId);
+        }
       });
 
       els.searchResults.appendChild(card);
@@ -507,22 +533,29 @@
   updateApiKeyUi();
 
   // ---------------------------------------------------------------------
-  // Queue (YouTube only)
+  // Queue — items are {id, videoId, title, addedBy}. When a shared session
+  // is active, the room's Durable Object is the source of truth and every
+  // mutation round-trips through it; otherwise the queue is purely local.
   // ---------------------------------------------------------------------
   const queue = [];
+
+  function makeLocalId() {
+    return `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
 
   function renderQueue() {
     els.queueList.innerHTML = '';
     queue.forEach((item, idx) => {
       const li = document.createElement('li');
       const label = document.createElement('span');
-      label.textContent = `${idx + 1}. ${item}`;
+      label.textContent = `${idx + 1}. ${item.title || item.videoId}`;
       const removeBtn = document.createElement('button');
       removeBtn.textContent = '✕';
       removeBtn.title = 'Entfernen';
       removeBtn.addEventListener('click', () => {
         queue.splice(idx, 1);
         renderQueue();
+        if (roomCode) removeQueueItemFromRoom(item.id);
       });
       li.appendChild(label);
       li.appendChild(removeBtn);
@@ -535,21 +568,208 @@
     if (queue.length === 0) return;
     const next = queue.shift();
     renderQueue();
-    loadVideo(next);
+    loadVideo(next.videoId);
     setTimeout(() => player && player.playVideo && player.playVideo(), 300);
+    if (roomCode) removeQueueItemFromRoom(next.id);
+  }
+
+  async function addToQueue(idOrUrl, titleOverride) {
+    const videoId = extractVideoId(idOrUrl);
+    if (!videoId) {
+      alert('Konnte keine gültige YouTube-Video-ID aus der Eingabe lesen.');
+      return;
+    }
+    const title = titleOverride || idOrUrl;
+    if (roomCode) {
+      await pushQueueItemToRoom({ videoId, title, addedBy: '' });
+    } else {
+      queue.push({ id: makeLocalId(), videoId, title, addedBy: '' });
+      renderQueue();
+    }
   }
 
   els.btnQueueAdd.addEventListener('click', () => {
     const val = els.queueUrl.value.trim();
     if (!val) return;
-    queue.push(val);
     els.queueUrl.value = '';
-    renderQueue();
+    addToQueue(val);
   });
   els.queueUrl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') els.btnQueueAdd.click();
   });
   els.btnQueueNext.addEventListener('click', playNextInQueue);
+
+  // ---------------------------------------------------------------------
+  // Shared session (Cloudflare Worker + Durable Object per room code).
+  // Lets other devices join via a short code / link and add songs to the
+  // same queue. Polling-based — good enough for a party queue, no need
+  // for WebSockets.
+  // ---------------------------------------------------------------------
+  const ROOM_API_BASE = 'https://singstar-karaoke-room.andreas-stetter73.workers.dev';
+
+  let roomCode = settings.roomCode || null;
+  let roomPollTimer = null;
+
+  function getJoinCodeFromUrl() {
+    const c = new URLSearchParams(location.search).get('join');
+    return c ? c.toUpperCase() : null;
+  }
+
+  function applyRemoteQueue(remoteItems) {
+    queue.length = 0;
+    remoteItems.forEach((it) => queue.push(it));
+    renderQueue();
+  }
+
+  function enterActiveSessionUi() {
+    els.sessionStartRow.classList.add('hidden');
+    els.sessionActiveRow.classList.remove('hidden');
+    els.sessionCode.textContent = roomCode;
+  }
+
+  async function fetchRoomState() {
+    if (!roomCode) return;
+    try {
+      const resp = await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/queue`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      applyRemoteQueue(data.queue || []);
+      if (data.apiKey && data.apiKey !== settings.youtubeApiKey) {
+        settings.youtubeApiKey = data.apiKey;
+        saveSettings({ youtubeApiKey: data.apiKey });
+        updateApiKeyUi();
+      }
+    } catch (e) {
+      // transient network errors: ignore, next poll retries
+    }
+  }
+
+  function startRoomPolling() {
+    stopRoomPolling();
+    fetchRoomState();
+    roomPollTimer = setInterval(fetchRoomState, 3000);
+  }
+
+  function stopRoomPolling() {
+    if (roomPollTimer) {
+      clearInterval(roomPollTimer);
+      roomPollTimer = null;
+    }
+  }
+
+  async function pushQueueItemToRoom(item) {
+    if (!roomCode) return;
+    try {
+      const resp = await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/queue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId: item.videoId, title: item.title || '', addedBy: item.addedBy || '' }),
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        applyRemoteQueue(data.queue || []);
+      } else {
+        els.sessionStatus.textContent = 'Fehler: ' + (data.error || `HTTP ${resp.status}`);
+        els.sessionStatus.style.color = 'var(--danger)';
+      }
+    } catch (e) {
+      els.sessionStatus.textContent = 'Song konnte nicht synchronisiert werden (Netzwerkfehler).';
+      els.sessionStatus.style.color = 'var(--danger)';
+    }
+  }
+
+  async function removeQueueItemFromRoom(itemId) {
+    if (!roomCode) return;
+    try {
+      const resp = await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/queue/${itemId}`, { method: 'DELETE' });
+      const data = await resp.json();
+      if (resp.ok) applyRemoteQueue(data.queue || []);
+    } catch (e) {
+      console.warn('Konnte Song nicht aus der Session entfernen:', e);
+    }
+  }
+
+  async function pushApiKeyToRoom(apiKey) {
+    if (!roomCode || !apiKey) return;
+    try {
+      await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/apikey`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey }),
+      });
+    } catch (e) {
+      console.warn('Konnte API-Key nicht mit Session teilen:', e);
+    }
+  }
+
+  async function startSession() {
+    els.btnSessionStart.disabled = true;
+    els.sessionStatus.textContent = 'Session wird erstellt…';
+    els.sessionStatus.style.color = 'var(--text-dim)';
+    try {
+      const resp = await fetch(`${ROOM_API_BASE}/api/rooms`, { method: 'POST' });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+
+      const localSnapshot = queue.map((it) => ({ ...it }));
+      roomCode = data.code;
+      saveSettings({ roomCode });
+      enterActiveSessionUi();
+      startRoomPolling();
+
+      if (hasApiKey()) await pushApiKeyToRoom(settings.youtubeApiKey);
+      for (const item of localSnapshot) {
+        await pushQueueItemToRoom(item);
+      }
+
+      els.sessionStatus.textContent = 'Session aktiv.';
+      els.sessionStatus.style.color = 'var(--ok)';
+    } catch (err) {
+      els.sessionStatus.textContent = 'Fehler beim Erstellen der Session: ' + err.message;
+      els.sessionStatus.style.color = 'var(--danger)';
+    } finally {
+      els.btnSessionStart.disabled = false;
+    }
+  }
+
+  function leaveSession() {
+    stopRoomPolling();
+    roomCode = null;
+    saveSettings({ roomCode: null });
+    els.sessionStartRow.classList.remove('hidden');
+    els.sessionActiveRow.classList.add('hidden');
+    els.sessionStatus.textContent = '';
+    if (document.body.classList.contains('join-mode')) {
+      const url = new URL(location.href);
+      url.searchParams.delete('join');
+      location.href = url.toString();
+    }
+  }
+
+  function joinRoomFromUrl(code) {
+    roomCode = code;
+    saveSettings({ roomCode: code });
+    document.body.classList.add('join-mode');
+    enterActiveSessionUi();
+    startRoomPolling();
+  }
+
+  els.btnSessionStart.addEventListener('click', startSession);
+  els.btnLeaveSession.addEventListener('click', leaveSession);
+  els.btnCopyLink.addEventListener('click', async () => {
+    const url = `${location.origin}${location.pathname}?join=${roomCode}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'SingStar Web Karaoke – Session beitreten', url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        els.sessionStatus.textContent = 'Link kopiert!';
+        els.sessionStatus.style.color = 'var(--ok)';
+      }
+    } catch (e) {
+      // user cancelled the share sheet or clipboard access was blocked — no-op
+    }
+  });
 
   // ---------------------------------------------------------------------
   // Video mixer controls
@@ -843,6 +1063,15 @@
   listAudioInputDevices();
   updatePlaceholder();
   updateTransportButtons();
+
+  const urlJoinCode = getJoinCodeFromUrl();
+  if (urlJoinCode) {
+    joinRoomFromUrl(urlJoinCode);
+  } else if (settings.roomCode) {
+    roomCode = settings.roomCode;
+    enterActiveSessionUi();
+    startRoomPolling();
+  }
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     els.micStatus.textContent = 'Dieser Browser unterstützt keinen Mikrofonzugriff (getUserMedia fehlt).';

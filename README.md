@@ -24,6 +24,10 @@ client-seitig, kein Server/Backend nötig.
   wieder in Einklang zu bringen
 - Einstellungen (Lautstärken, Delays, gewähltes Gerät) werden im Browser (localStorage) gemerkt
 - Bühnenmodus/Vollbild für die Party
+- **Gemeinsame Session**: Über einen kleinen Cloudflare Worker (Durable Object pro Session) lässt sich eine
+  geteilte Warteliste öffnen – andere Geräte (z.B. Gäste-Handys) rufen einen Link/Code auf und können Songs
+  zur selben Warteliste hinzufügen, inklusive automatisch geteiltem YouTube-API-Key. Ein Gerät, das über den
+  Link beitritt, bekommt automatisch eine schlanke Mobile-Ansicht ohne Player/Mixer, nur Suche + Warteliste
 
 ## Nutzung
 
@@ -75,12 +79,14 @@ Ausführliche Hinweise gibt es auch direkt in der App über den **Hilfe**-Button
 singstar-karaoke/
 ├── index.html      Aufbau der Seite (Video-Panel, Mixer, Hilfe-Dialog)
 ├── style.css       Dark-Stage-Theme
-├── app.js          YouTube-Player, Web-Audio-Mixer, Sync-Logik, Persistenz
-└── assets/         Logo/Grafiken
+├── app.js          YouTube-Player, Web-Audio-Mixer, Sync-Logik, Persistenz, Session-Sync
+├── assets/         Logo/Grafiken
+└── worker/         Cloudflare Worker (Durable Object) für die geteilte Session, siehe worker/README.md
 ```
 
-Kein Build-Schritt, keine Abhängigkeiten außer der YouTube-IFrame-API (wird per
-`<script>`-Tag von YouTube geladen).
+Frontend: Kein Build-Schritt, keine Abhängigkeiten außer der YouTube-IFrame-API (wird per
+`<script>`-Tag von YouTube geladen). Der Worker im `worker/`-Verzeichnis ist ein separates,
+eigenständig deploybares Projekt (Details dort).
 
 ## GitHub Pages aktivieren
 
