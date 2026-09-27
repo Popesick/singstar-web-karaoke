@@ -658,6 +658,41 @@
     });
   }
 
+  // Age-restricted videos refuse to play in an embedded player for anyone
+  // not signed in on youtube.com ("Sign in to confirm your age") even
+  // though the search API's own videoEmbeddable/videoSyndicated filters
+  // let them through — those two flags only mean "embedding isn't
+  // disabled by the uploader", not "actually playable here". A second,
+  // cheap videos.list lookup (1 unit vs. 100 for the search itself) is
+  // needed to see the real content rating and filter those out too.
+  async function filterOutAgeRestricted(items) {
+    const ids = items.map((item) => item.id && item.id.videoId).filter(Boolean);
+    if (!ids.length) return items;
+    try {
+      const params = new URLSearchParams({
+        part: 'contentDetails',
+        id: ids.join(','),
+        key: settings.youtubeApiKey,
+      });
+      const resp = await fetch(`https://www.googleapis.com/youtube/v3/videos?${params.toString()}`);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error((data && data.error && data.error.message) || `HTTP ${resp.status}`);
+      const restrictedIds = new Set(
+        (data.items || [])
+          .filter((v) => v.contentDetails && v.contentDetails.contentRating
+            && v.contentDetails.contentRating.ytRating === 'ytAgeRestricted')
+          .map((v) => v.id)
+      );
+      return items.filter((item) => !restrictedIds.has(item.id && item.id.videoId));
+    } catch (err) {
+      // If this lookup itself fails, still show the search results rather
+      // than hiding everything behind an unrelated error — age-restricted
+      // videos are the exception, not the common case.
+      console.warn('Konnte Altersbeschränkung nicht prüfen:', err);
+      return items;
+    }
+  }
+
   async function runSearch(query, pageToken) {
     if (!hasApiKey()) {
       els.searchStatus.textContent = 'Bitte zuerst einen YouTube-API-Key hinterlegen (siehe unten).';
@@ -692,19 +727,21 @@
         throw new Error((data && data.error && data.error.message) || `HTTP ${resp.status}`);
       }
 
+      const playableItems = await filterOutAgeRestricted(data.items || []);
+
       if (!pageToken) els.searchResults.innerHTML = '';
-      renderSearchResults(data.items || []);
+      renderSearchResults(playableItems);
       nextPageToken = data.nextPageToken || null;
       els.btnSearchMore.classList.toggle('hidden', !nextPageToken);
 
       const totalShown = els.searchResults.children.length;
       if (totalShown === 0) {
-        els.searchStatus.textContent = 'Keine einbettbaren Videos gefunden. Anderen Suchbegriff versuchen.';
+        els.searchStatus.textContent = 'Keine abspielbaren Videos gefunden. Anderen Suchbegriff versuchen.';
         els.searchStatus.style.color = 'var(--text-dim)';
         els.searchResultsHeader.classList.add('hidden');
         els.searchResults.classList.add('hidden');
       } else {
-        els.searchStatus.textContent = `${totalShown} einbettbare(s) Video(s) gefunden.`;
+        els.searchStatus.textContent = `${totalShown} abspielbare(s) Video(s) gefunden.`;
         els.searchStatus.style.color = 'var(--ok)';
         els.searchResultsHeader.classList.remove('hidden');
         els.searchResults.classList.remove('hidden');

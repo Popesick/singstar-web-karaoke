@@ -14,7 +14,8 @@ client-seitig, kein Server/Backend nötig.
   lassen sich als Datei exportieren/importieren (z.B. zum Teilen) und werden lokal automatisch gemerkt
 - **Karaoke-Suche** direkt in der App über die offizielle YouTube Data API v3 (eigener, kostenloser API-Key
   nötig) – zeigt dank `videoEmbeddable`/`videoSyndicated`-Filter von vornherein nur Videos, die sich auch
-  wirklich einbetten und abspielen lassen
+  wirklich einbetten und abspielen lassen, und filtert zusätzlich altersbeschränkte Videos heraus (die
+  verweigern die Wiedergabe im eingebetteten Player trotz `videoEmbeddable=true`)
 - **Alternativ: lokale Videodatei** (MP4/WebM/…) direkt abspielen – nützlich, wenn ein YouTube-Video das
   Einbetten nicht erlaubt, oder für eigene Karaoke-Videos. Der Ton läuft dabei sogar echt über die
   Web-Audio-Engine (keine Cross-Origin-Einschränkung wie bei YouTube)

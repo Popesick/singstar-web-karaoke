@@ -11,7 +11,7 @@
      after a deploy. Bump both ?v= values (any change is enough) whenever
      app.js or style.css changes. -->
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
-<link rel="stylesheet" href="style.css?v=20260927a">
+<link rel="stylesheet" href="style.css?v=20260927b">
 </head>
 <body>
 
@@ -478,6 +478,10 @@
       <code>videoSyndicated=true</code>) – dadurch werden von vornherein nur Videos angezeigt, die sich extern
       einbetten und abspielen lassen. Das genaue Problem aus der Kurzanleitung ("Video nicht verfügbar –
       Wiedergabe auf anderen Websites deaktiviert") taucht in den Suchergebnissen also gar nicht erst auf.
+      Zusätzlich prüft die App für jedes Ergebnis per <code>contentDetails.contentRating</code>, ob es
+      altersbeschränkt ist ("Sign in to confirm your age") – solche Videos lassen sich zwar technisch
+      einbetten, verweigern die Wiedergabe im eingebetteten Player aber trotzdem und werden daher ebenfalls
+      aus den Suchergebnissen entfernt.
     </p>
     <p>Dafür wird ein <b>eigener, kostenloser</b> API-Key benötigt:</p>
     <ol>
@@ -519,6 +523,6 @@
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js?v=20260927a"></script>
+<script src="app.js?v=20260927b"></script>
 </body>
 </html>
