@@ -123,6 +123,15 @@
             </div>
           </div>
           <p class="hint">QR-Code scannen, Link öffnen oder Code eingeben – andere können dann Songs zur gemeinsamen Warteliste hinzufügen.</p>
+
+          <div class="phone-mic-row">
+            <button id="btnUsePhoneAsMic" class="btn primary">🎤 Als Mikro verwenden</button>
+            <button id="btnStopPhoneAsMic" class="btn ghost hidden">Mikro trennen</button>
+            <p id="phoneMicStatus" class="hint"></p>
+            <p class="hint">Überträgt den Ton dieses Geräts in Echtzeit per WebRTC zur Hauptsession und legt ihn dort über den
+              Video-Sound. Lautstärke und Verzögerung dafür stellt die Hauptsession unter Einstellungen →
+              Externe Mikrofone ein. Bis zu 4 Handy-Mikros gleichzeitig möglich.</p>
+          </div>
         </div>
         <p id="sessionStatus" class="hint"></p>
       </div>
@@ -238,6 +247,14 @@
 
       <p id="micStatus" class="hint">Mikrofone noch nicht aktiviert.</p>
     </div>
+
+    <div class="mixer-group" id="phoneMicsGroup">
+      <div class="mixer-row head">
+        <span>📱 Externe Mikrofone (Handys)</span>
+      </div>
+      <p id="phoneMicsHint" class="hint">Für Handy-Mikrofone zuerst eine Session starten (Warteliste-Bereich → "Session starten").</p>
+      <div id="phoneMicsList" class="mic-columns"></div>
+    </div>
   </div>
 </div>
 
@@ -277,6 +294,22 @@
       unkritisch; den Code entsprechend nicht öffentlich teilen. Ein geteilter API-Key sollte wie oben
       beschrieben per HTTP-Referrer eingeschränkt sein. Sessions laufen nicht automatisch ab; "Verbindung
       trennen" beendet nur die Teilnahme des eigenen Geräts, nicht die Session selbst.
+    </p>
+
+    <h3>Handy als drahtloses Mikrofon</h3>
+    <p>
+      Innerhalb einer laufenden Session zeigt jedes Gerät einen Button <b>🎤 Als Mikro verwenden</b>: Das
+      Gerät nimmt seinen eigenen Mikrofon-Ton auf und überträgt ihn per <b>WebRTC in Echtzeit</b> (typisch
+      20–60 ms Latenz) direkt zur Hauptsession, wo er über den Video-Sound gelegt wird – bis zu 4 Geräte
+      gleichzeitig. Die Hauptsession regelt Lautstärke, Verzögerung (Delay) und Stumm für jedes Handy-Mikro
+      einzeln unter <b>⚙ Einstellungen → Externe Mikrofone (Handys)</b>, inklusive VU-Meter.
+    </p>
+    <p class="hint">
+      Verbindungsaufbau (wer mit wem spricht) läuft über denselben Cloudflare Worker wie die Warteliste; der
+      eigentliche Ton geht danach direkt zwischen den Geräten hin und her, nicht über den Worker. Funktioniert
+      zuverlässig im selben WLAN; in restriktiveren Netzwerken (z.B. manche Firmen-/Hotel-Netze) kann der
+      Verbindungsaufbau ohne einen zusätzlichen TURN-Server fehlschlagen. "Trennen" (auf beiden Seiten
+      verfügbar) gibt den Platz wieder frei.
     </p>
 
     <h3>Original SingStar-USB-Mikrofone (PS2)</h3>

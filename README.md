@@ -31,6 +31,10 @@ client-seitig, kein Server/Backend nötig.
   oder geben den Code ein und können Songs zur selben Warteliste hinzufügen, inklusive automatisch geteiltem
   YouTube-API-Key. Ein Gerät, das über den
   Link beitritt, bekommt automatisch eine schlanke Mobile-Ansicht ohne Player/Mixer, nur Suche + Warteliste
+- **Handy als drahtloses Mikrofon**: Innerhalb einer Session per WebRTC (Browser-zu-Browser-Audio in
+  Echtzeit, ~20–60 ms Latenz) den Ton eines Geräts direkt zur Hauptsession übertragen und über den
+  Video-Sound legen – bis zu 4 Geräte gleichzeitig, jedes mit eigener Lautstärke/Delay/Stumm/VU-Meter unter
+  Einstellungen → Externe Mikrofone
 
 ## Nutzung
 

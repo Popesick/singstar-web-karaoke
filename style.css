@@ -418,6 +418,25 @@ html, body {
   width: 100%;
 }
 
+.phone-mic-row {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+
+.phone-mic-row .btn {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+#phoneMicsList:empty::after {
+  content: "Noch keine Handy-Mikros verbunden.";
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  grid-column: 1 / -1;
+}
+
 .session-code-row {
   display: flex;
   flex-wrap: wrap;

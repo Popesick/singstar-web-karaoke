@@ -49,6 +49,13 @@
     btnLeaveSession: document.getElementById('btnLeaveSession'),
     sessionStatus: document.getElementById('sessionStatus'),
 
+    btnUsePhoneAsMic: document.getElementById('btnUsePhoneAsMic'),
+    btnStopPhoneAsMic: document.getElementById('btnStopPhoneAsMic'),
+    phoneMicStatus: document.getElementById('phoneMicStatus'),
+    phoneMicsGroup: document.getElementById('phoneMicsGroup'),
+    phoneMicsHint: document.getElementById('phoneMicsHint'),
+    phoneMicsList: document.getElementById('phoneMicsList'),
+
     queueSection: document.getElementById('queueSection'),
     queueUrl: document.getElementById('queueUrl'),
     btnQueueAdd: document.getElementById('btnQueueAdd'),
@@ -170,6 +177,19 @@
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
   }
+
+  // audioCtx often gets created/resumed from a timer (polling for a phone
+  // mic offer, for example) rather than directly inside a click handler —
+  // browsers only auto-run an AudioContext when its creation/resume traces
+  // back to a genuine user gesture, so a context created from a timer can
+  // stay silently "suspended" forever with no code ever retrying it. This
+  // catches the next real interaction anywhere on the page and gives it
+  // one more nudge.
+  ['click', 'touchstart', 'keydown'].forEach((evt) => {
+    document.addEventListener(evt, () => {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }, { passive: true });
+  });
 
   // ---------------------------------------------------------------------
   // Video source mode: 'youtube' or 'local'. Both sources are wrapped behind
@@ -877,6 +897,7 @@
       saveSettings({ roomCode });
       enterActiveSessionUi();
       startRoomPolling();
+      startMicsHostPolling();
 
       if (hasApiKey()) await pushApiKeyToRoom(settings.youtubeApiKey);
       for (const item of localSnapshot) {
@@ -898,6 +919,8 @@
 
   function leaveSession() {
     stopRoomPolling();
+    stopMicsHostPolling();
+    if (phoneSender) stopUsingPhoneAsMic(true);
     roomCode = null;
     saveSettings({ roomCode: null });
     els.sessionStartRow.classList.remove('hidden');
@@ -1147,6 +1170,351 @@
     navigator.mediaDevices.addEventListener('devicechange', () => listAudioInputDevices());
 
   // ---------------------------------------------------------------------
+  // Phone-as-wireless-mic (WebRTC). Signaling is plain HTTP polling through
+  // the same room Worker used for the queue — connection setup takes a
+  // couple of seconds, but once connected, audio flows directly between the
+  // phone and the host over WebRTC, not through the Worker.
+  //
+  // Host side: polls /mics, answers new offers, and mixes each incoming
+  // MediaStream through the same gain -> delay -> mute -> analyser chain
+  // used for the local mics, straight into audioCtx.destination.
+  // Phone side: grabs its own mic, creates an offer, and polls for the
+  // host's answer + ICE candidates.
+  // ---------------------------------------------------------------------
+  const MIC_SLOTS = ['1', '2', '3', '4'];
+  const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+
+  const phoneMics = {}; // slot -> { pc, label, connected, appliedIce, chainNodes, gainVal, delayVal, muted, vuCanvas }
+  let micsPollTimer = null;
+  let phoneSender = null; // { pc, stream, slot, statusTimer }
+
+  function disconnectPhoneMic(slot, notifyServer) {
+    const entry = phoneMics[slot];
+    if (!entry) return;
+    try { entry.pc.close(); } catch (e) { /* noop */ }
+    if (entry.chainNodes) {
+      Object.values(entry.chainNodes).forEach((n) => {
+        try { n.disconnect(); } catch (e) { /* noop */ }
+      });
+    }
+    delete phoneMics[slot];
+    renderPhoneMics();
+    if (notifyServer && roomCode) {
+      fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics/${slot}/leave`, { method: 'POST' }).catch(() => {});
+    }
+  }
+
+  async function answerPhoneMic(slot, offerSdp, label) {
+    const ctx = ensureAudioCtx();
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const entry = {
+      pc, label: label || `Mikro ${slot}`, connected: false, appliedIce: new Set(),
+      chainNodes: null, gainVal: 100, delayVal: 0, muted: false, vuCanvas: null,
+    };
+    phoneMics[slot] = entry;
+    renderPhoneMics();
+
+    pc.ontrack = (event) => {
+      const stream = event.streams[0];
+      const source = ctx.createMediaStreamSource(stream);
+      const gain = ctx.createGain();
+      gain.gain.value = entry.gainVal / 100;
+      const delay = ctx.createDelay(1.0);
+      delay.delayTime.value = entry.delayVal / 1000;
+      const muteGain = ctx.createGain();
+      muteGain.gain.value = entry.muted ? 0 : 1;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.6;
+      source.connect(gain);
+      gain.connect(delay);
+      delay.connect(muteGain);
+      muteGain.connect(analyser);
+      analyser.connect(ctx.destination);
+      entry.chainNodes = { source, gain, delay, muteGain, analyser };
+      startVuLoop();
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (!phoneMics[slot]) return;
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+        disconnectPhoneMic(slot, true);
+        return;
+      }
+      entry.connected = pc.connectionState === 'connected';
+      renderPhoneMics();
+    };
+
+    pc.onicecandidate = (e) => {
+      if (!e.candidate) return;
+      fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics/${slot}/ice-from-host`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate }),
+      }).catch(() => {});
+    };
+
+    try {
+      await pc.setRemoteDescription({ type: 'offer', sdp: offerSdp });
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics/${slot}/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sdp: answer.sdp }),
+      });
+    } catch (e) {
+      console.warn('Handy-Mikro Verbindungsaufbau fehlgeschlagen:', e);
+      disconnectPhoneMic(slot, true);
+    }
+  }
+
+  function applyPhoneIce(slot, candidates) {
+    const entry = phoneMics[slot];
+    if (!entry) return;
+    (candidates || []).forEach((c) => {
+      const key = JSON.stringify(c);
+      if (!entry.appliedIce.has(key)) {
+        entry.appliedIce.add(key);
+        entry.pc.addIceCandidate(c).catch(() => {});
+      }
+    });
+  }
+
+  async function pollMics() {
+    if (!roomCode) return;
+    try {
+      const resp = await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const mics = data.mics || {};
+      MIC_SLOTS.forEach((slot) => {
+        const remote = mics[slot];
+        if (!remote) return;
+        if (remote.taken && remote.offer && !phoneMics[slot]) {
+          answerPhoneMic(slot, remote.offer, remote.label);
+        } else if (!remote.taken && phoneMics[slot]) {
+          disconnectPhoneMic(slot, false);
+        } else if (remote.taken && phoneMics[slot]) {
+          applyPhoneIce(slot, remote.iceFromPhone);
+        }
+      });
+    } catch (e) {
+      // transient network errors: ignore, next poll retries
+    }
+  }
+
+  function startMicsHostPolling() {
+    stopMicsHostPolling();
+    pollMics();
+    micsPollTimer = setInterval(pollMics, 2000);
+    renderPhoneMics();
+  }
+
+  function stopMicsHostPolling() {
+    if (micsPollTimer) {
+      clearInterval(micsPollTimer);
+      micsPollTimer = null;
+    }
+    MIC_SLOTS.forEach((slot) => disconnectPhoneMic(slot, false));
+    renderPhoneMics();
+  }
+
+  function renderPhoneMics() {
+    if (!els.phoneMicsList) return;
+    els.phoneMicsList.innerHTML = '';
+    MIC_SLOTS.forEach((slot) => {
+      const entry = phoneMics[slot];
+      if (!entry) return;
+
+      const col = document.createElement('div');
+      col.className = 'mic-col';
+
+      const h3 = document.createElement('h3');
+      h3.textContent = entry.label + ' ';
+      const tag = document.createElement('span');
+      tag.className = 'ch-tag';
+      tag.textContent = entry.connected ? 'verbunden' : 'verbindet…';
+      h3.appendChild(tag);
+      col.appendChild(h3);
+
+      const canvas = document.createElement('canvas');
+      canvas.className = 'vu-meter';
+      canvas.width = 220;
+      canvas.height = 14;
+      col.appendChild(canvas);
+      entry.vuCanvas = canvas;
+
+      const gainRow = document.createElement('div');
+      gainRow.className = 'mixer-row';
+      const gainLabel = document.createElement('label');
+      gainLabel.textContent = 'Lautstärke';
+      const gainInput = document.createElement('input');
+      gainInput.type = 'range';
+      gainInput.min = '0';
+      gainInput.max = '200';
+      gainInput.value = String(entry.gainVal);
+      const gainVal = document.createElement('span');
+      gainVal.className = 'val';
+      gainVal.textContent = String(entry.gainVal);
+      gainInput.addEventListener('input', () => {
+        const v = Number(gainInput.value);
+        gainVal.textContent = String(v);
+        entry.gainVal = v;
+        if (entry.chainNodes) entry.chainNodes.gain.gain.value = v / 100;
+      });
+      gainRow.append(gainLabel, gainInput, gainVal);
+      col.appendChild(gainRow);
+
+      const delayRow = document.createElement('div');
+      delayRow.className = 'mixer-row';
+      const delayLabel = document.createElement('label');
+      delayLabel.textContent = 'Delay (ms)';
+      const delayInput = document.createElement('input');
+      delayInput.type = 'range';
+      delayInput.min = '0';
+      delayInput.max = '500';
+      delayInput.step = '5';
+      delayInput.value = String(entry.delayVal);
+      const delayVal = document.createElement('span');
+      delayVal.className = 'val';
+      delayVal.textContent = String(entry.delayVal);
+      delayInput.addEventListener('input', () => {
+        const v = Number(delayInput.value);
+        delayVal.textContent = String(v);
+        entry.delayVal = v;
+        if (entry.chainNodes) entry.chainNodes.delay.delayTime.value = v / 1000;
+      });
+      delayRow.append(delayLabel, delayInput, delayVal);
+      col.appendChild(delayRow);
+
+      const muteRow = document.createElement('div');
+      muteRow.className = 'mixer-row checkbox-row';
+      const muteLabel = document.createElement('label');
+      const muteCb = document.createElement('input');
+      muteCb.type = 'checkbox';
+      muteCb.checked = entry.muted;
+      muteCb.addEventListener('change', () => {
+        entry.muted = muteCb.checked;
+        if (entry.chainNodes) entry.chainNodes.muteGain.gain.value = entry.muted ? 0 : 1;
+      });
+      muteLabel.appendChild(muteCb);
+      muteLabel.append(' Stumm');
+      muteRow.appendChild(muteLabel);
+      col.appendChild(muteRow);
+
+      const disconnectBtn = document.createElement('button');
+      disconnectBtn.type = 'button';
+      disconnectBtn.className = 'btn small ghost';
+      disconnectBtn.textContent = 'Trennen';
+      disconnectBtn.addEventListener('click', () => disconnectPhoneMic(slot, true));
+      col.appendChild(disconnectBtn);
+
+      els.phoneMicsList.appendChild(col);
+    });
+    if (els.phoneMicsHint) {
+      els.phoneMicsHint.classList.toggle('hidden', !!roomCode);
+    }
+  }
+
+  // --- Phone side: use this device's own mic as a wireless sender ---
+  async function startUsingPhoneAsMic() {
+    if (!roomCode) return;
+    els.btnUsePhoneAsMic.disabled = true;
+    els.phoneMicStatus.textContent = 'Verbinde…';
+    els.phoneMicStatus.style.color = 'var(--text-dim)';
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const joinResp = await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics/join`, { method: 'POST' });
+      const joinData = await joinResp.json();
+      if (!joinResp.ok) throw new Error(joinData.error || `HTTP ${joinResp.status}`);
+      const slot = joinData.slot;
+
+      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+
+      pc.onicecandidate = (e) => {
+        if (!e.candidate) return;
+        fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics/${slot}/ice-from-phone`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidate: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate }),
+        }).catch(() => {});
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') {
+          els.phoneMicStatus.textContent = `✓ Als Mikro verbunden (Platz ${slot})`;
+          els.phoneMicStatus.style.color = 'var(--ok)';
+        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+          els.phoneMicStatus.textContent = 'Verbindung verloren.';
+          els.phoneMicStatus.style.color = 'var(--danger)';
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics/${slot}/offer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sdp: offer.sdp, label: '' }),
+      });
+
+      const appliedIce = new Set();
+      const statusTimer = setInterval(async () => {
+        if (!phoneSender) { clearInterval(statusTimer); return; }
+        try {
+          const resp = await fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics/${slot}/status`);
+          const data = await resp.json();
+          if (!data.taken) {
+            stopUsingPhoneAsMic(false);
+            return;
+          }
+          if (data.answer && pc.signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription({ type: 'answer', sdp: data.answer });
+          }
+          (data.iceFromHost || []).forEach((c) => {
+            const key = JSON.stringify(c);
+            if (!appliedIce.has(key)) {
+              appliedIce.add(key);
+              pc.addIceCandidate(c).catch(() => {});
+            }
+          });
+        } catch (e) {
+          // transient — retry next tick
+        }
+      }, 1200);
+
+      phoneSender = { pc, stream, slot, statusTimer };
+      els.btnUsePhoneAsMic.classList.add('hidden');
+      els.btnStopPhoneAsMic.classList.remove('hidden');
+    } catch (err) {
+      els.phoneMicStatus.textContent = 'Fehler: ' + err.message;
+      els.phoneMicStatus.style.color = 'var(--danger)';
+      els.btnUsePhoneAsMic.disabled = false;
+    }
+  }
+
+  function stopUsingPhoneAsMic(notifyServer) {
+    if (!phoneSender) return;
+    const { pc, stream, slot, statusTimer } = phoneSender;
+    clearInterval(statusTimer);
+    try { pc.close(); } catch (e) { /* noop */ }
+    stream.getTracks().forEach((t) => t.stop());
+    if (notifyServer !== false && roomCode) {
+      fetch(`${ROOM_API_BASE}/api/rooms/${roomCode}/mics/${slot}/leave`, { method: 'POST' }).catch(() => {});
+    }
+    phoneSender = null;
+    els.btnUsePhoneAsMic.classList.remove('hidden');
+    els.btnUsePhoneAsMic.disabled = false;
+    els.btnStopPhoneAsMic.classList.add('hidden');
+    els.phoneMicStatus.textContent = '';
+  }
+
+  els.btnUsePhoneAsMic.addEventListener('click', startUsingPhoneAsMic);
+  els.btnStopPhoneAsMic.addEventListener('click', () => stopUsingPhoneAsMic(true));
+
+  // ---------------------------------------------------------------------
   // VU meters
   // ---------------------------------------------------------------------
   function drawVu(canvas, analyser) {
@@ -1171,10 +1539,14 @@
   }
 
   function startVuLoop() {
-    if (vuAnimHandle) cancelAnimationFrame(vuAnimHandle);
+    if (vuAnimHandle) return; // already running — one shared loop draws whatever exists
     const loop = () => {
       drawVu(els.vu1, chain[1].analyser);
       drawVu(els.vu2, chain[2].analyser);
+      MIC_SLOTS.forEach((slot) => {
+        const entry = phoneMics[slot];
+        if (entry && entry.vuCanvas && entry.chainNodes) drawVu(entry.vuCanvas, entry.chainNodes.analyser);
+      });
       vuAnimHandle = requestAnimationFrame(loop);
     };
     loop();
@@ -1251,6 +1623,7 @@
     roomCode = settings.roomCode;
     enterActiveSessionUi();
     startRoomPolling();
+    startMicsHostPolling();
   }
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
