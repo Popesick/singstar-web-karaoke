@@ -5,7 +5,7 @@ per Web Audio API dazugemischt. Video- und Mikrofon-Ton lassen sich getrennt
 regeln und per Delay/Sync-Offset aufeinander abstimmen. Läuft komplett
 client-seitig, kein Server/Backend nötig.
 
-**[Live-Demo (GitHub Pages)](#)** – Link erscheint hier, sobald Pages aktiviert ist (siehe unten).
+**[Live-Demo (GitHub Pages)](https://popesick.github.io/singstar-web-karaoke/)**
 
 ## Features
 
