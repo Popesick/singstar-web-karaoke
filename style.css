@@ -105,6 +105,14 @@ html, body {
 .btn.ghost {
   background: transparent;
 }
+.btn.danger {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.btn.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+}
 .btn.small {
   padding: 5px 10px;
   font-size: 0.75rem;

@@ -1095,11 +1095,20 @@
 
   async function startMicEngine() {
     try {
+      // Whatever is currently selected in the dropdown wins — this matters
+      // when startMicEngine() re-runs because the user just picked a
+      // different device: listAudioInputDevices() below rebuilds the
+      // <select> from scratch, and without capturing the user's choice
+      // first it would silently fall back to the last *saved* device,
+      // snapping the dropdown right back to what it was before their click
+      // ever registered.
+      const desiredDeviceId = els.micDeviceSelect.value || settings.micDeviceId;
+
       // Request permission first so device labels become available, then
       // rebuild the device list and (re)open the stream on the chosen device.
       const tmpStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       tmpStream.getTracks().forEach((t) => t.stop());
-      await listAudioInputDevices(settings.micDeviceId);
+      await listAudioInputDevices(desiredDeviceId);
 
       const deviceId = els.micDeviceSelect.value || undefined;
       const baseConstraints = {
@@ -1141,11 +1150,47 @@
       saveSettings({ micDeviceId: deviceId || null });
 
       startVuLoop();
+      updateMicButtonState();
     } catch (err) {
       console.error(err);
       els.micStatus.textContent = 'Fehler beim Zugriff auf das Mikrofon: ' + err.message;
       els.micStatus.style.color = 'var(--danger)';
     }
+  }
+
+  // Releases the local mic stream and tears down its part of the audio
+  // graph, without touching the shared AudioContext (still needed for local
+  // video playback / phone mics) or the dropdown's remembered device choice.
+  function stopMicEngine() {
+    if (micStream) {
+      micStream.getTracks().forEach((t) => t.stop());
+      micStream = null;
+    }
+    disconnectAudioGraph();
+    [1, 2].forEach((ch) => {
+      const c = chain[ch];
+      c.gain = null;
+      c.delay = null;
+      c.muteGain = null;
+      c.limiter = null;
+      c.analyser = null;
+    });
+    sourceNode = null;
+    splitterNode = null;
+    masterGainNode = null;
+    masterLimiterNode = null;
+
+    els.micStatus.textContent = 'Mikrofone deaktiviert.';
+    els.micStatus.style.color = '';
+    els.audioStatus.textContent = 'Audio-Engine: inaktiv';
+    updateMicButtonState();
+  }
+
+  function updateMicButtonState() {
+    const active = !!micStream;
+    els.btnMicStart.textContent = active ? 'Mikros deaktivieren' : 'Mikros aktivieren';
+    els.btnMicStart.classList.toggle('danger', active);
+    els.btnMicStart.classList.toggle('primary', !active);
   }
 
   function disconnectAudioGraph() {
@@ -1236,7 +1281,13 @@
     };
   }
 
-  els.btnMicStart.addEventListener('click', startMicEngine);
+  els.btnMicStart.addEventListener('click', () => {
+    if (micStream) {
+      stopMicEngine();
+    } else {
+      startMicEngine();
+    }
+  });
 
   els.micDeviceSelect.addEventListener('change', () => {
     if (micStream) startMicEngine();
@@ -1277,7 +1328,7 @@
   });
 
   navigator.mediaDevices && navigator.mediaDevices.addEventListener &&
-    navigator.mediaDevices.addEventListener('devicechange', () => listAudioInputDevices());
+    navigator.mediaDevices.addEventListener('devicechange', () => listAudioInputDevices(els.micDeviceSelect.value || settings.micDeviceId));
 
   // ---------------------------------------------------------------------
   // Phone-as-wireless-mic (WebRTC). Signaling is plain HTTP polling through

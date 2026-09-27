@@ -60,7 +60,8 @@ client-seitig, kein Server/Backend nötig.
    Danach `http://localhost:8080` im Browser öffnen.
 
 3. YouTube-Link oder Video-ID einfügen → **Laden**.
-4. **Mikros aktivieren** klicken, Mikrofonzugriff erlauben, passendes USB-Gerät auswählen.
+4. **Mikros aktivieren** klicken, Mikrofonzugriff erlauben, passendes USB-Gerät auswählen (derselbe
+   Button wird danach zu **Mikros deaktivieren**, um das Mikrofon wieder freizugeben).
 5. Lautstärken für Video und Mikrofon(e) einstellen. Falls Bild/Ton bzw. Gesang nicht
    synchron wirken, **Sync-Offset** und/oder **Mikro-Delay** in kleinen Schritten anpassen.
 
