@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SingStar Web Karaoke</title>
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/logo.svg" alt="Logo" class="logo" onerror="this.style.display='none'">
+      <div>
+        <h1>SingStar Web Karaoke</h1>
+        <p class="tagline">YouTube + Mikrofon-Mixer im Browser</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="btnHelp" class="btn ghost" title="Hilfe &amp; SingStar-Mikros">Hilfe</button>
+      <button id="btnStage" class="btn ghost" title="Bühnenmodus / Vollbild">Bühnenmodus</button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- VIDEO / STAGE -->
+    <section class="panel video-panel">
+      <div class="video-wrap">
+        <div id="player"></div>
+        <div id="videoPlaceholder" class="video-placeholder">
+          <p>Kein Video geladen.<br>YouTube-Link oder Video-ID unten einfügen &amp; laden.</p>
+        </div>
+      </div>
+
+      <div class="video-controls">
+        <input id="videoUrl" type="text" placeholder="YouTube-Link oder Video-ID einfügen…" autocomplete="off">
+        <button id="btnLoad" class="btn primary">Laden</button>
+        <button id="btnPlayPause" class="btn" disabled>▶ Play</button>
+        <button id="btnRestart" class="btn" disabled>⟲ Neustart</button>
+      </div>
+
+      <div class="queue-row">
+        <input id="queueUrl" type="text" placeholder="Nächsten Song zur Warteliste hinzufügen…" autocomplete="off">
+        <button id="btnQueueAdd" class="btn">+ Warteliste</button>
+        <button id="btnQueueNext" class="btn" disabled>Nächster ▶</button>
+      </div>
+      <ul id="queueList" class="queue-list"></ul>
+    </section>
+
+    <!-- MIXER -->
+    <section class="panel mixer-panel">
+      <h2>Mixer</h2>
+
+      <div class="mixer-group">
+        <div class="mixer-row head">
+          <span>Video-Ton</span>
+        </div>
+        <div class="mixer-row">
+          <label for="videoVolume">Lautstärke</label>
+          <input id="videoVolume" type="range" min="0" max="100" value="80">
+          <span id="videoVolumeVal" class="val">80</span>
+        </div>
+        <div class="mixer-row">
+          <label for="videoOffset">Sync-Offset (ms)</label>
+          <input id="videoOffset" type="range" min="-500" max="500" value="0" step="10">
+          <span id="videoOffsetVal" class="val">0</span>
+        </div>
+        <p class="hint">Positiv = Video läuft später (für langsame Mikro-Kette). Negativ = Video läuft früher.</p>
+      </div>
+
+      <div class="mixer-group">
+        <div class="mixer-row head">
+          <span>Mikrofone</span>
+          <button id="btnMicStart" class="btn small primary">Mikros aktivieren</button>
+        </div>
+
+        <div class="mixer-row">
+          <label for="micDeviceSelect">Audiogerät</label>
+          <select id="micDeviceSelect"></select>
+        </div>
+        <div class="mixer-row checkbox-row">
+          <label><input type="checkbox" id="stereoSplit" checked> Stereo-Splitting (SingStar/2-Kanal-USB: L = Mikro 1, R = Mikro 2)</label>
+        </div>
+
+        <div class="mic-columns">
+          <div class="mic-col">
+            <h3>Mikro 1 <span class="ch-tag">L</span></h3>
+            <canvas id="vu1" class="vu-meter" width="220" height="14"></canvas>
+            <div class="mixer-row">
+              <label for="mic1Gain">Lautstärke</label>
+              <input id="mic1Gain" type="range" min="0" max="200" value="100">
+              <span id="mic1GainVal" class="val">100</span>
+            </div>
+            <div class="mixer-row">
+              <label for="mic1Delay">Delay (ms)</label>
+              <input id="mic1Delay" type="range" min="0" max="500" value="0" step="5">
+              <span id="mic1DelayVal" class="val">0</span>
+            </div>
+            <div class="mixer-row checkbox-row">
+              <label><input type="checkbox" id="mic1Mute"> Stumm</label>
+            </div>
+          </div>
+
+          <div class="mic-col">
+            <h3>Mikro 2 <span class="ch-tag">R</span></h3>
+            <canvas id="vu2" class="vu-meter" width="220" height="14"></canvas>
+            <div class="mixer-row">
+              <label for="mic2Gain">Lautstärke</label>
+              <input id="mic2Gain" type="range" min="0" max="200" value="100">
+              <span id="mic2GainVal" class="val">100</span>
+            </div>
+            <div class="mixer-row">
+              <label for="mic2Delay">Delay (ms)</label>
+              <input id="mic2Delay" type="range" min="0" max="500" value="0" step="5">
+              <span id="mic2DelayVal" class="val">0</span>
+            </div>
+            <div class="mixer-row checkbox-row">
+              <label><input type="checkbox" id="mic2Mute"> Stumm</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="mixer-row">
+          <label for="masterMicGain">Mikro-Master</label>
+          <input id="masterMicGain" type="range" min="0" max="200" value="100">
+          <span id="masterMicGainVal" class="val">100</span>
+        </div>
+
+        <p id="micStatus" class="hint">Mikrofone noch nicht aktiviert.</p>
+      </div>
+
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <span id="ytStatus">YouTube-Player: wird geladen…</span>
+    <span class="sep">·</span>
+    <span id="audioStatus">Audio-Engine: inaktiv</span>
+  </footer>
+</div>
+
+<!-- HELP / SINGSTAR MODAL -->
+<div id="helpModal" class="modal hidden">
+  <div class="modal-content">
+    <button id="btnHelpClose" class="btn ghost modal-close">✕</button>
+    <h2>Hilfe &amp; SingStar-PS2-Mikrofone</h2>
+
+    <h3>Kurzanleitung</h3>
+    <ol>
+      <li>YouTube-Link oder Video-ID einfügen und <b>Laden</b> klicken.</li>
+      <li>Auf <b>Mikros aktivieren</b> klicken und im Browser den Mikrofonzugriff erlauben.</li>
+      <li>Passendes USB-Audiogerät in der Liste auswählen.</li>
+      <li>Lautstärken für Video und Mikro(s) getrennt einstellen.</li>
+      <li>Falls Gesang/Bild nicht synchron wirken: <b>Sync-Offset</b> bzw. <b>Mikro-Delay</b> in kleinen Schritten anpassen, bis es passt.</li>
+    </ol>
+
+    <h3>Original SingStar-USB-Mikrofone (PS2)</h3>
+    <p>
+      Die originalen SingStar-Mikrofone für die PS2 werden nicht direkt, sondern über den mitgelieferten
+      <b>USB-Funkempfänger (Dongle)</b> angeschlossen. Dieser Dongle ist klassenkonform
+      (<i>USB Audio Class</i>) und wird von Windows, macOS und Linux ohne Zusatztreiber als ganz normales
+      Mikrofon-Eingabegerät erkannt – meist als 2-kanaliges Stereo-Gerät, bei dem
+      <b>Mikrofon 1 auf dem linken</b> und <b>Mikrofon 2 auf dem rechten Kanal</b> liegt.
+    </p>
+    <ol>
+      <li>USB-Dongle einstecken, den Browser als Audioquelle nutzen lassen.</li>
+      <li>In den Betriebssystem-Soundeinstellungen prüfen, wie das Gerät heißt (z.B. "USB Microphone" o.ä.).</li>
+      <li>In dieser App unter <b>Audiogerät</b> genau dieses Gerät auswählen.</li>
+      <li><b>Stereo-Splitting</b> aktiviert lassen – die App trennt L/R automatisch in Mikro 1 und Mikro 2.</li>
+      <li>Falls nur ein Mikro Ton liefert oder beide vertauscht sind: Mikrofone testweise tauschen bzw.
+        Lautstärkeregler der beiden Spalten einzeln prüfen.</li>
+    </ol>
+    <p class="hint">
+      Hinweis: Manche Mainboards/USB-Controller liefern das Signal sehr leise. In diesem Fall den
+      Regler "Lautstärke" der Mikro-Spalte über 100% anheben.
+    </p>
+
+    <h3>Technische Grenzen</h3>
+    <ul>
+      <li>Der Ton eines eingebetteten YouTube-Videos kann aus rechtlichen/technischen Gründen (Cross-Origin)
+        nicht in die Web-Audio-Engine eingespeist werden. Video- und Mikrofon-Lautstärke werden daher
+        getrennt, aber parallel geregelt (YouTube-eigene Lautstärke + Web-Audio-Mixer für Mikros).</li>
+      <li>Für den Sync-Ausgleich wird die Videowiedergabe zeitlich nachjustiert bzw. das Mikrofonsignal
+        per Delay-Node verzögert.</li>
+      <li>Bei Wiedergabe über Lautsprecher (statt Kopfhörer) kann es zu Rückkopplungen/Echo kommen – für
+        beste Ergebnisse Kopfhörer für die Sänger:innen verwenden oder Lautsprecher-Lautstärke moderat halten.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script src="app.js"></script>
+</body>
+</html>
