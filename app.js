@@ -252,20 +252,40 @@
   // fresh (cache-busted) copy of the script every few seconds; a transient
   // blip often clears up within a handful of attempts. Harmless if the
   // original request eventually does succeed — the watchdog just stops.
+  //
+  // After the first burst of quick attempts, this does NOT give up for
+  // good — it falls back to a slow, indefinite retry in the background.
+  // A blocked/broken request often clears up on its own after a while
+  // (blocker rule reload, flaky WLAN, YouTube-side hiccup) and the page
+  // should recover from that without the user having to notice and
+  // manually retry. The status text always reflects the current attempt
+  // so it's clear this is still actively trying, not just stuck.
   let ytWatchdogAttempts = 0;
+  let ytWatchdogTimer = null;
   function ytApiWatchdog() {
     if (playerReady) return;
     ytWatchdogAttempts++;
-    if (ytWatchdogAttempts > 6) {
-      els.ytStatus.textContent = 'YouTube-Player: konnte nicht geladen werden (Netzwerk/Blocker?)';
-      return;
-    }
-    els.ytStatus.textContent = `YouTube-Player: erneuter Versuch (${ytWatchdogAttempts})…`;
+    const slowPhase = ytWatchdogAttempts > 6;
+    els.ytStatus.textContent = slowPhase
+      ? 'YouTube-Player: konnte noch nicht geladen werden (Netzwerk/Blocker?) — versucht im Hintergrund weiter. Klicken zum sofortigen erneuten Versuch.'
+      : `YouTube-Player: erneuter Versuch (${ytWatchdogAttempts})…`;
     const script = document.createElement('script');
     script.src = `https://www.youtube.com/iframe_api?retry=${ytWatchdogAttempts}-${Date.now()}`;
     document.body.appendChild(script);
-    setTimeout(ytApiWatchdog, 5000);
+    ytWatchdogTimer = setTimeout(ytApiWatchdog, slowPhase ? 15000 : 5000);
   }
+  // Lets a user action (clicking the status text, hitting "Erneut versuchen",
+  // or just trying to load a video again) collapse straight back to the fast
+  // retry cadence instead of waiting out the current slow-phase interval.
+  function kickYtWatchdog() {
+    if (playerReady) return;
+    if (ytWatchdogTimer) clearTimeout(ytWatchdogTimer);
+    ytWatchdogAttempts = 0;
+    ytApiWatchdog();
+  }
+  els.ytStatus.style.cursor = 'pointer';
+  els.ytStatus.title = 'Klicken, um die YouTube-Player-Verbindung erneut zu versuchen';
+  els.ytStatus.addEventListener('click', kickYtWatchdog);
   setTimeout(ytApiWatchdog, 4000);
 
   function onPlayerError(event) {
@@ -474,6 +494,11 @@
       return false;
     }
     if (!playerReady) {
+      // If the watchdog has already dropped into its slow background phase,
+      // a fresh load attempt is a clear signal the user is actively waiting
+      // right now — collapse back to the fast retry cadence instead of
+      // possibly sitting through most of a 15s slow-phase interval first.
+      if (attempt === 0) kickYtWatchdog();
       // The YT IFrame API can take a moment after page load to finish
       // initializing (it fetches extra resources from youtube.com) — after
       // a reload this has repeatedly taken noticeably longer than a few
@@ -500,6 +525,7 @@
 
   els.btnRetryPlayer.addEventListener('click', () => {
     hidePlayerError();
+    kickYtWatchdog();
     if (lastLoadRequest) loadVideo(lastLoadRequest.idOrUrl, { onLoaded: lastLoadRequest.onLoaded });
   });
 

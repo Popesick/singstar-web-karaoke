@@ -45,9 +45,12 @@
         <div id="playerErrorBanner" class="player-error hidden">
           <p><b>YouTube-Player konnte nicht geladen werden.</b></p>
           <p>Die App hat bereits mehrfach automatisch versucht, das YouTube-Script neu zu laden (siehe Status
-            unten), ohne Erfolg. Meist ein Ad-/Tracking-Blocker, der das YouTube-Embed-Script blockiert (auch
-            wenn youtube.com selbst normal funktioniert), gelegentlich auch nur eine vorübergehende
-            Netzwerkstörung. Blocker für diese Seite deaktivieren/whitelisten, dann erneut versuchen.</p>
+            unten), ohne Erfolg, und versucht es im Hintergrund weiter alle paar Sekunden. Meist ein
+            Ad-/Tracking-Blocker, der das YouTube-Embed-Script blockiert (auch wenn youtube.com selbst normal
+            funktioniert), gelegentlich auch nur eine vorübergehende Netzwerkstörung. Blocker für diese Seite
+            deaktivieren/whitelisten, dann erneut versuchen (auch der Status-Text unten in der Fußzeile lässt
+            sich anklicken, um sofort einen neuen Versuch auszulösen, statt auf den nächsten Hintergrund-Versuch
+            zu warten).</p>
           <button id="btnRetryPlayer" class="btn primary small">Erneut versuchen</button>
         </div>
       </div>
@@ -456,8 +459,10 @@
       <li><b>"YouTube-Player konnte nicht geladen werden"</b>: Das liegt so gut wie immer an einem
         Ad-/Tracking-Blocker im Browser (z.B. uBlock Origin), der das eingebettete YouTube-Player-Script
         blockiert – auch wenn youtube.com direkt aufgerufen normal funktioniert, da Embed-Player oft separat
-        gefiltert werden. Abhilfe: den Blocker für diese Seite deaktivieren bzw. auf die Whitelist setzen,
-        dann die Seite neu laden. Das kann von der App aus nicht umgangen werden.</li>
+        gefiltert werden. Abhilfe: den Blocker für diese Seite deaktivieren bzw. auf die Whitelist setzen. Die
+        App versucht die Verbindung danach automatisch im Hintergrund weiter neu aufzubauen (kein manuelles
+        Neuladen der Seite nötig) – ein Klick auf den Status-Text unten in der Fußzeile löst sofort einen neuen
+        Versuch aus, statt auf den nächsten Hintergrund-Versuch zu warten.</li>
     </ul>
 
     <h3 id="help-api-key">Karaoke-Suche &amp; YouTube-API-Key</h3>
