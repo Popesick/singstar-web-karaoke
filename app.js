@@ -15,6 +15,7 @@
     localVideo: document.getElementById('localVideo'),
     localFileInput: document.getElementById('localFileInput'),
     localFileName: document.getElementById('localFileName'),
+    btnLocalQueueAdd: document.getElementById('btnLocalQueueAdd'),
 
     videoUrl: document.getElementById('videoUrl'),
     btnLoad: document.getElementById('btnLoad'),
@@ -125,12 +126,13 @@
   // Toast (brief confirmation messages, e.g. "added to queue")
   // ---------------------------------------------------------------------
   let toastTimer = null;
-  function showToast(message) {
+  function showToast(message, type, durationMs) {
     if (!els.toast) return;
     els.toast.textContent = message;
+    els.toast.classList.toggle('toast-error', type === 'error');
     els.toast.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2200);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), durationMs || (type === 'error' ? 4500 : 2200));
   }
 
   // ---------------------------------------------------------------------
@@ -202,6 +204,7 @@
       events: {
         onReady: onPlayerReady,
         onStateChange: onPlayerStateChange,
+        onError: onPlayerError,
       },
     });
   };
@@ -210,6 +213,27 @@
     playerReady = true;
     els.ytStatus.textContent = 'YouTube-Player: bereit';
     player.setVolume(Number(els.videoVolume.value));
+  }
+
+  function onPlayerError(event) {
+    // YT error codes: 2 = ungültige Video-ID, 5 = HTML5-Player-Fehler,
+    // 100 = Video nicht gefunden/privat, 101/150 = Embedding vom
+    // Rechteinhaber deaktiviert. Dieser Fehler ist unabhängig vom
+    // "Player nicht bereit"-Fall — der Player läuft hier bereits, nur
+    // dieses eine Video lässt sich nicht abspielen.
+    const code = event && event.data;
+    let message;
+    if (code === 101 || code === 150) {
+      message = 'Dieses Video kann hier nicht eingebettet werden (vom Rechteinhaber deaktiviert). Über die Karaoke-Suche nach einer einbettbaren Version suchen oder eine lokale Datei nutzen.';
+    } else if (code === 100) {
+      message = 'Video nicht gefunden oder privat.';
+    } else if (code === 2) {
+      message = 'Ungültige YouTube-Video-ID.';
+    } else {
+      message = `YouTube meldet einen Wiedergabefehler (Code ${code}).`;
+    }
+    console.warn('YT player error', code);
+    showToast(message, 'error', 5000);
   }
 
   function onPlayerStateChange(event) {
@@ -247,9 +271,7 @@
     }
   }
 
-  els.localFileInput.addEventListener('change', () => {
-    const file = els.localFileInput.files[0];
-    if (!file) return;
+  function loadLocalFile(file) {
     if (localObjectUrl) URL.revokeObjectURL(localObjectUrl);
     localObjectUrl = URL.createObjectURL(file);
     els.localVideo.src = localObjectUrl;
@@ -257,6 +279,25 @@
     ensureLocalAudioGraph();
     updatePlaceholder();
     updateTransportButtons();
+  }
+
+  els.localFileInput.addEventListener('change', () => {
+    const file = els.localFileInput.files[0];
+    if (!file) return;
+    loadLocalFile(file);
+    els.btnLocalQueueAdd.disabled = false;
+  });
+
+  els.btnLocalQueueAdd.addEventListener('click', () => {
+    const file = els.localFileInput.files[0];
+    if (!file) return;
+    if (roomCode) {
+      showToast('Lokale Dateien können nicht in eine geteilte Session aufgenommen werden (andere Geräte haben keinen Zugriff auf deine Datei).', 'error');
+      return;
+    }
+    queue.push({ id: makeLocalId(), source: 'local', videoId: null, title: file.name, file, addedBy: '' });
+    renderQueue();
+    showToast(`✓ „${file.name}“ (lokale Datei) zur Warteliste hinzugefügt`);
   });
 
   els.localVideo.addEventListener('play', () => { if (mode === 'local') handlePlaybackStateChange('playing'); });
@@ -346,7 +387,6 @@
     els.localControls.classList.toggle('hidden', mode !== 'local');
     els.playerEl.classList.toggle('hidden', mode !== 'youtube');
     els.localVideo.classList.toggle('hidden', mode !== 'local');
-    els.queueSection.classList.toggle('hidden', mode !== 'youtube');
 
     els.btnPlayPause.textContent = '▶ Play';
     updatePlaceholder();
@@ -618,9 +658,11 @@
   updateApiKeyUi();
 
   // ---------------------------------------------------------------------
-  // Queue — items are {id, videoId, title, addedBy}. When a shared session
-  // is active, the room's Durable Object is the source of truth and every
-  // mutation round-trips through it; otherwise the queue is purely local.
+  // Queue — items are {id, source: 'youtube'|'local', videoId, title,
+  // addedBy, file?}. When a shared session is active, the room's Durable
+  // Object is the source of truth for 'youtube' items and every mutation
+  // round-trips through it; 'local' items (a File only this browser has)
+  // never leave this device and can't be added while a session is active.
   // ---------------------------------------------------------------------
   const queue = [];
 
@@ -633,7 +675,8 @@
     queue.forEach((item, idx) => {
       const li = document.createElement('li');
       const label = document.createElement('span');
-      label.textContent = `${idx + 1}. ${item.title || item.videoId}`;
+      const icon = item.source === 'local' ? '💾 ' : '';
+      label.textContent = `${idx + 1}. ${icon}${item.title || item.videoId}`;
       const removeBtn = document.createElement('button');
       removeBtn.textContent = '✕';
       removeBtn.title = 'Entfernen';
@@ -653,10 +696,16 @@
     if (queue.length === 0) return;
     const next = queue.shift();
     renderQueue();
-    loadVideo(next.videoId, {
-      onLoaded: () => setTimeout(() => player && player.playVideo && player.playVideo(), 200),
-    });
-    if (roomCode) removeQueueItemFromRoom(next.id);
+    if (next.source === 'local' && next.file) {
+      setMode('local');
+      loadLocalFile(next.file);
+      setTimeout(() => els.localVideo.play().catch(() => {}), 100);
+    } else {
+      loadVideo(next.videoId, {
+        onLoaded: () => setTimeout(() => player && player.playVideo && player.playVideo(), 200),
+      });
+    }
+    if (roomCode && next.source !== 'local') removeQueueItemFromRoom(next.id);
   }
 
   async function addToQueue(idOrUrl, titleOverride) {
@@ -670,7 +719,7 @@
     if (roomCode) {
       success = await pushQueueItemToRoom({ videoId, title, addedBy: '' });
     } else {
-      queue.push({ id: makeLocalId(), videoId, title, addedBy: '' });
+      queue.push({ id: makeLocalId(), source: 'youtube', videoId, title, addedBy: '' });
       renderQueue();
     }
     if (success) showToast(`✓ „${title}“ zur Warteliste hinzugefügt`);
@@ -819,7 +868,11 @@
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
 
-      const localSnapshot = queue.map((it) => ({ ...it }));
+      // Local-file queue items are a browser-local File object — they can't
+      // be transmitted to the room, so they're dropped here (and never sent
+      // to pushQueueItemToRoom, which only accepts a youtube videoId).
+      const localFileCount = queue.filter((it) => it.source === 'local').length;
+      const localSnapshot = queue.filter((it) => it.source !== 'local').map((it) => ({ ...it }));
       roomCode = data.code;
       saveSettings({ roomCode });
       enterActiveSessionUi();
@@ -832,6 +885,9 @@
 
       els.sessionStatus.textContent = 'Session aktiv.';
       els.sessionStatus.style.color = 'var(--ok)';
+      if (localFileCount > 0) {
+        showToast(`${localFileCount} lokale Datei(en) aus der Warteliste entfernt (in Sessions nicht unterstützt).`, 'error');
+      }
     } catch (err) {
       els.sessionStatus.textContent = 'Fehler beim Erstellen der Session: ' + err.message;
       els.sessionStatus.style.color = 'var(--danger)';
