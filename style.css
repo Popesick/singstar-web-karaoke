@@ -791,7 +791,8 @@ body.stage-mode #btnMenu {
 
 body.stage-mode .playlist-panel,
 body.stage-mode .topbar-actions #btnHelp,
-body.stage-mode .topbar-actions #btnSettings {
+body.stage-mode .topbar-actions #btnSettings,
+body.stage-mode .topbar-actions #btnExperimental {
   display: none;
 }
 
@@ -808,4 +809,65 @@ body.stage-mode .video-panel {
 body.stage-mode .video-wrap {
   aspect-ratio: auto;
   height: 88vh;
+}
+
+/* Experimentell: Gesangstrennung, Track-Liste, Pitch-Scoring */
+.exp-track-row {
+  background: #150f26;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.exp-track-name {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.exp-track-status {
+  margin-bottom: 8px;
+}
+
+.exp-track-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.exp-progress {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.exp-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #29e0ff);
+  transition: width 0.3s ease;
+}
+
+.exp-lyrics-preview {
+  margin-top: 8px;
+  max-height: 3.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exp-pitch-canvas {
+  width: 100%;
+  height: 160px;
+  display: block;
+  background: #0a0512;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
+.exp-lyrics-box {
+  white-space: pre-wrap;
+  max-height: 120px;
+  overflow-y: auto;
 }

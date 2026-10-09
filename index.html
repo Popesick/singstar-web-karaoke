@@ -11,7 +11,7 @@
      after a deploy. Bump both ?v= values (any change is enough) whenever
      app.js or style.css changes. -->
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
-<link rel="stylesheet" href="style.css?v=20260927b">
+<link rel="stylesheet" href="style.css?v=20261009a">
 </head>
 <body>
 
@@ -30,6 +30,7 @@
       <button id="btnSettings" class="btn ghost" title="Einstellungen (Mixer, API-Key)">⚙ Einstellungen</button>
       <button id="btnHelp" class="btn ghost" title="Hilfe &amp; SingStar-Mikros">Hilfe</button>
       <button id="btnStage" class="btn ghost" title="Bühnenmodus / Vollbild">Bühnenmodus</button>
+      <button id="btnExperimental" class="btn ghost" title="Experimentell: KI-Gesangstrennung &amp; Tonhöhen-Scoring">🧪 Experimentell</button>
     </div>
   </header>
 
@@ -303,6 +304,21 @@
       <p id="phoneMicsHint" class="hint">Für Handy-Mikrofone zuerst eine Session starten (Warteliste-Bereich → "Session starten").</p>
       <div id="phoneMicsList" class="mic-columns"></div>
     </div>
+
+    <div class="mixer-group">
+      <div class="mixer-row head">
+        <span>🧪 Experimentell: Original-Gesang</span>
+      </div>
+      <div class="mixer-row">
+        <label for="expVocalVolume">Lautstärke</label>
+        <input id="expVocalVolume" type="range" min="0" max="100" value="100">
+        <span id="expVocalVolumeVal" class="val">100</span>
+      </div>
+      <p class="hint">
+        Lautstärke der (per KI getrennten) Original-Gesangsspur bei der Wiedergabe unter
+        "🧪 Experimentell" – auf 0 stellen für reines Karaoke ohne Vorsänger, hoch stellen zum Mitsingen-Üben.
+      </p>
+    </div>
   </div>
 </div>
 
@@ -518,11 +534,90 @@
       diesem Browser existiert, ist das nur ohne aktive Session möglich; bereits geteilte Sessions können
       keine lokalen Dateien enthalten.
     </p>
+
+    <h3>🧪 Experimentell: KI-Gesangstrennung &amp; Tonhöhen-Scoring</h3>
+    <p>
+      Über den Menüpunkt <b>🧪 Experimentell</b> lässt sich ein beliebiger Song (Video/MP3/WAV/M4A) hochladen;
+      die App trennt Gesang und Instrumental per KI (Demucs/htdemucs, Metas quelloffenes
+      Gesangstrennungs-Modell, als ONNX-Export) komplett lokal im Browser – ohne Upload zu einem Server. Beim
+      Abspielen zeigt die App die Tonhöhe des Original-Gesangs als scrollenden Balken (wie im echten SingStar)
+      und vergleicht sie live mit der per Mikrofon erkannten eigenen Tonhöhe, inklusive Score. Die Lautstärke
+      des Original-Gesangs lässt sich unter <b>⚙ Einstellungen → Experimentell: Original-Gesang</b> frei
+      zwischen 0–100% regeln.
+    </p>
+    <p class="hint">
+      Wichtige Einschränkungen, da das Ganze bewusst experimentell ist:
+    </p>
+    <ul>
+      <li><b>Geschwindigkeit:</b> Die KI-Trennung läuft als echte neuronale Netz-Berechnung im Browser (kein
+        Server). Mit einer aktuellen Grafikkarte/einem aktuellen Browser (WebGPU, z.B. Chrome) dauert ein
+        kurzer Song wenige Minuten; ohne WebGPU-Unterstützung (Fallback auf reines CPU/WASM) kann es für einen
+        ganzen Song deutlich länger dauern. Der erste Durchlauf lädt zusätzlich einmalig das ca. 180&nbsp;MB
+        große Modell herunter (wird danach im Browser zwischengespeichert).</li>
+      <li><b>Trennqualität hängt stark vom Gesangsstil ab:</b> Klare, "normale" Gesangsaufnahmen trennen sich
+        meist brauchbar. Stark verzerrter, geschriener oder extrem verfremdeter Gesang (z.B. Metal/Screamo,
+        Vocoder-Effekte) wird vom Modell oft kaum als "Gesang" erkannt, da es überwiegend mit klassischerem
+        Gesang trainiert wurde – das Ergebnis kann dann nahezu stumm bleiben.</li>
+      <li><b>Songtext-Erkennung ist Beta und technisch ein Umweg:</b> Browser können von sich aus keine
+        Audiodatei direkt per Spracherkennung transkribieren – die kostenlose Web-Speech-API hört nur live über
+        das Mikrofon mit. "Text erkennen" spielt den getrennten Gesang deshalb über die Lautsprecher ab,
+        während das Mikrofon akustisch mithört; das funktioniert nur einigermaßen in einem leisen Raum, ohne
+        zuverlässige Zeitstempel für eine zeilenweise Textanzeige.</li>
+      <li><b>Speicherung:</b> Alles (Originaldatei, getrennte Spuren) wird nur lokal in diesem Browser
+        gespeichert (IndexedDB) – noch keine Cloud-Ablage (z.B. Google Drive) und noch keine Möglichkeit, einen
+        so verarbeiteten Song über eine geteilte Session von anderen Geräten zur Warteliste hinzufügen zu
+        lassen. Das ist für eine spätere Ausbaustufe vorgesehen.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- EXPERIMENTELL MODAL: KI-Gesangstrennung, Tonhöhen-Scoring, Lyrics-Beta -->
+<div id="experimentalModal" class="modal hidden">
+  <div class="modal-content">
+    <button id="btnExperimentalClose" class="btn ghost modal-close">✕</button>
+    <h2>🧪 Experimentell</h2>
+    <p class="hint">
+      KI-Gesangstrennung läuft komplett lokal im Browser (kein Upload, kein Server) über ein echtes
+      neuronales Netz (Demucs/htdemucs von Meta, MIT-lizenziert) – das bedeutet aber auch: ein einmaliger
+      ~180&nbsp;MB-Modell-Download, und die Trennung selbst dauert je nach Song und Gerät mehrere Minuten
+      (CPU-Berechnung im Browser, keine Server-GPU). Die Trennqualität hängt stark vom Gesangsstil ab: saubere
+      Gesangsaufnahmen trennen sich meist gut, stark verzerrter/geschriener Gesang dagegen oft schlecht.
+      Alles wird nur lokal in diesem Browser gespeichert (noch keine Cloud-/Geräte-übergreifende Ablage).
+    </p>
+
+    <div class="mixer-group">
+      <div class="mixer-row head"><span>Track hochladen</span></div>
+      <div class="video-controls">
+        <label for="expUploadInput" class="btn primary file-btn">Video/Audio auswählen</label>
+        <input id="expUploadInput" type="file" accept="video/*,audio/*,.mp3,.wav,.m4a" class="file-input">
+      </div>
+      <p class="hint">Unterstützt alles, was der Browser selbst dekodieren kann (u.a. MP3, WAV, M4A, MP4).</p>
+    </div>
+
+    <div class="mixer-group">
+      <div class="mixer-row head"><span>Meine Tracks</span></div>
+      <div id="expTrackList"></div>
+    </div>
+
+    <div id="expPlayerArea" class="mixer-group hidden">
+      <div class="mixer-row head">
+        <span>▶ <span id="expNowPlayingName"></span></span>
+        <span>Score: <b id="expScoreVal">–</b></span>
+      </div>
+      <canvas id="expPitchCanvas" class="exp-pitch-canvas" width="700" height="160"></canvas>
+      <p class="hint">
+        Blaue Balken = Ziel-Tonhöhe des Original-Gesangs, pinker Punkt = deine live per Mikrofon erkannte
+        Tonhöhe. Score zählt, wie oft du nah genug an der Zielnote liegst (wie im Original-SingStar – die
+        Musik selbst wird dabei nicht automatisch korrigiert).
+      </p>
+      <p id="expLyricsBox" class="hint exp-lyrics-box"></p>
+    </div>
   </div>
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js?v=20260927b"></script>
+<script src="app.js?v=20261009a"></script>
+<script src="experimental.js?v=20261009a"></script>
 </body>
 </html>

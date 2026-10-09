@@ -45,6 +45,16 @@ client-seitig, kein Server/Backend nötig.
   Eigenes Pegel-Meter + leuchtendes Mikro-Symbol auf dem sendenden Gerät zur Fehlersuche ("kommt überhaupt Ton
   am Mikro an?"). Gegen akustische Rückkopplung (Handy-Mikro hört die Lautsprecher der Hauptsession):
   niedrigerer Standard-Pegel (70%) plus ein Begrenzer (Limiter) pro Handy-Mikro-Kanal
+- **🧪 Experimentell: KI-Gesangstrennung & Tonhöhen-Scoring** (`experimental.js`, eigenes Modul): beliebigen
+  Song (Video/MP3/WAV/M4A) hochladen, Gesang/Instrumental werden per Demucs/htdemucs (Metas quelloffenes
+  Trennungs-Modell, ONNX-Export) komplett lokal im Browser getrennt (WebGPU wenn verfügbar, sonst
+  WASM-Fallback; einmaliger ~180&nbsp;MB-Modell-Download, danach im Browser zwischengespeichert). Beim
+  Abspielen zeigt die App die Original-Tonhöhe als scrollenden Balken (SingStar-Stil) und vergleicht sie live
+  per Mikrofon gegen die eigene Stimme inkl. Score; die Lautstärke des Original-Gesangs ist unter
+  Einstellungen frei regelbar (0–100%). Songtext-Erkennung (Beta) läuft über die kostenlose Web-Speech-API,
+  die nur live über Mikrofon zuhören kann – dafür wird der Gesang über Lautsprecher abgespielt, während das
+  Mikrofon mithört. Alles wird nur lokal (IndexedDB) gespeichert, noch keine Cloud-Ablage oder
+  Cross-Device-Freigabe über die geteilte Session. Trennqualität hängt stark vom Gesangsstil ab.
 
 ## Nutzung
 
