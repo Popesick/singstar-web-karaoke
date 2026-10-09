@@ -11,7 +11,7 @@
      after a deploy. Bump both ?v= values (any change is enough) whenever
      app.js or style.css changes. -->
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
-<link rel="stylesheet" href="style.css?v=20261009a">
+<link rel="stylesheet" href="style.css?v=20261009b">
 </head>
 <body>
 
@@ -550,10 +550,13 @@
     </p>
     <ul>
       <li><b>Geschwindigkeit:</b> Die KI-Trennung läuft als echte neuronale Netz-Berechnung im Browser (kein
-        Server). Mit einer aktuellen Grafikkarte/einem aktuellen Browser (WebGPU, z.B. Chrome) dauert ein
-        kurzer Song wenige Minuten; ohne WebGPU-Unterstützung (Fallback auf reines CPU/WASM) kann es für einen
-        ganzen Song deutlich länger dauern. Der erste Durchlauf lädt zusätzlich einmalig das ca. 180&nbsp;MB
-        große Modell herunter (wird danach im Browser zwischengespeichert).</li>
+        Server). Mit GPU-Beschleunigung über WebGPU (z.B. Chrome/Safari auf einem Mac mit Apple-Chip – jede
+        M-Generation gleichermaßen, da der Browser den genauen Chip aus Datenschutzgründen nicht preisgibt;
+        ebenso auf PCs mit unterstützter Grafikkarte) dauert ein kurzer Song wenige Minuten; ohne
+        WebGPU-Unterstützung (Fallback auf reines CPU/WASM) kann es für einen ganzen Song deutlich länger
+        dauern. Der Experimentell-Dialog zeigt oben direkt an, ob gerade GPU-beschleunigt gerechnet wird. Der
+        erste Durchlauf lädt zusätzlich einmalig das ca. 180&nbsp;MB große Modell herunter (wird danach im
+        Browser zwischengespeichert).</li>
       <li><b>Trennqualität hängt stark vom Gesangsstil ab:</b> Klare, "normale" Gesangsaufnahmen trennen sich
         meist brauchbar. Stark verzerrter, geschriener oder extrem verfremdeter Gesang (z.B. Metal/Screamo,
         Vocoder-Effekte) wird vom Modell oft kaum als "Gesang" erkannt, da es überwiegend mit klassischerem
@@ -579,11 +582,13 @@
     <p class="hint">
       KI-Gesangstrennung läuft komplett lokal im Browser (kein Upload, kein Server) über ein echtes
       neuronales Netz (Demucs/htdemucs von Meta, MIT-lizenziert) – das bedeutet aber auch: ein einmaliger
-      ~180&nbsp;MB-Modell-Download, und die Trennung selbst dauert je nach Song und Gerät mehrere Minuten
-      (CPU-Berechnung im Browser, keine Server-GPU). Die Trennqualität hängt stark vom Gesangsstil ab: saubere
-      Gesangsaufnahmen trennen sich meist gut, stark verzerrter/geschriener Gesang dagegen oft schlecht.
-      Alles wird nur lokal in diesem Browser gespeichert (noch keine Cloud-/Geräte-übergreifende Ablage).
+      ~180&nbsp;MB-Modell-Download, und die Trennung selbst dauert je nach Song und Gerät von wenigen Minuten
+      (mit GPU-Beschleunigung über WebGPU) bis zu deutlich länger (reiner CPU-Fallback). Die Trennqualität
+      hängt stark vom Gesangsstil ab: saubere Gesangsaufnahmen trennen sich meist gut, stark
+      verzerrter/geschriener Gesang dagegen oft schlecht. Alles wird nur lokal in diesem Browser gespeichert
+      (noch keine Cloud-/Geräte-übergreifende Ablage).
     </p>
+    <p id="expAccelStatus" class="hint"></p>
 
     <div class="mixer-group">
       <div class="mixer-row head"><span>Track hochladen</span></div>
@@ -617,7 +622,7 @@
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js?v=20261009a"></script>
-<script src="experimental.js?v=20261009a"></script>
+<script src="app.js?v=20261009b"></script>
+<script src="experimental.js?v=20261009b"></script>
 </body>
 </html>

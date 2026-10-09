@@ -202,6 +202,37 @@
     return blob.arrayBuffer();
   }
 
+  // Browsers deliberately do not expose which exact chip is running (M1 vs.
+  // M2 vs. ... vs. M5 — that's fingerprinting surface), so there is no such
+  // thing as per-generation code here. What IS detectable and meaningful:
+  // whether WebGPU is backed by an Apple GPU at all (same acceleration path
+  // on every Apple-Silicon Mac, whichever generation) — used only to show an
+  // honest status, not to branch logic.
+  let accelInfoPromise = null;
+  async function detectAccelerationInfo() {
+    if (accelInfoPromise) return accelInfoPromise;
+    accelInfoPromise = (async () => {
+      if (!navigator.gpu) return { backend: 'none', label: 'Kein WebGPU verfügbar – läuft auf der CPU (WASM), deutlich langsamer.' };
+      try {
+        const adapter = await navigator.gpu.requestAdapter();
+        if (!adapter) return { backend: 'none', label: 'WebGPU-Adapter nicht verfügbar – läuft auf der CPU (WASM), deutlich langsamer.' };
+        const info = adapter.info || (adapter.requestAdapterInfo ? await adapter.requestAdapterInfo() : null);
+        const vendor = ((info && (info.vendor || info.architecture)) || '').toLowerCase();
+        const isApple = vendor.includes('apple') || /mac/i.test(navigator.platform || '') && vendor === '';
+        return {
+          backend: 'webgpu',
+          isApple,
+          label: isApple
+            ? 'Apple-GPU über WebGPU erkannt – Gesangstrennung läuft GPU-beschleunigt (gilt gleichermaßen für alle M-Chip-Generationen).'
+            : `WebGPU aktiv${vendor ? ` (GPU: ${vendor})` : ''} – Gesangstrennung läuft GPU-beschleunigt.`,
+        };
+      } catch (err) {
+        return { backend: 'none', label: 'WebGPU-Prüfung fehlgeschlagen – läuft auf der CPU (WASM), deutlich langsamer.' };
+      }
+    })();
+    return accelInfoPromise;
+  }
+
   async function getOrtSession(onModelProgress) {
     if (ortSessionPromise) return ortSessionPromise;
     ortSessionPromise = (async () => {
@@ -213,12 +244,22 @@
       // so tens of minutes for a full song) — prefer WebGPU where the browser
       // supports it, falling back to WASM everywhere else. GitHub Pages can't
       // set the COOP/COEP headers multi-threaded WASM would need, so WebGPU
-      // is the only realistic speedup available here.
+      // is the only realistic speedup available here. 'webnn' is included as
+      // a best-effort extra attempt (could reach e.g. the Apple Neural Engine
+      // on supporting systems) — still experimental and unsupported in most
+      // current browsers, so it's expected to just be silently dropped.
       if (navigator.gpu) {
         try {
           return await ort.InferenceSession.create(bytes, { executionProviders: ['webgpu', 'wasm'] });
         } catch (err) {
           console.warn('WebGPU-Ausführung fehlgeschlagen, falle auf WASM zurück:', err);
+        }
+      }
+      if (navigator.ml) {
+        try {
+          return await ort.InferenceSession.create(bytes, { executionProviders: ['webnn', 'wasm'] });
+        } catch (err) {
+          console.warn('WebNN-Ausführung fehlgeschlagen, falle auf WASM zurück:', err);
         }
       }
       return ort.InferenceSession.create(bytes, { executionProviders: ['wasm'] });
@@ -438,12 +479,19 @@
     els.expNowPlayingName = q('expNowPlayingName');
     els.expLyricsBox = q('expLyricsBox');
     els.expScoreVal = q('expScoreVal');
+    els.expAccelStatus = q('expAccelStatus');
 
     if (!els.btnExperimental) return; // HTML not present (shouldn't happen)
 
     els.btnExperimental.addEventListener('click', () => {
       els.experimentalModal.classList.remove('hidden');
       renderTrackList();
+      detectAccelerationInfo().then((info) => {
+        if (els.expAccelStatus) {
+          els.expAccelStatus.textContent = info.label;
+          els.expAccelStatus.style.color = info.backend === 'none' ? 'var(--danger)' : 'var(--ok)';
+        }
+      });
     });
     els.btnExperimentalClose.addEventListener('click', () => {
       els.experimentalModal.classList.add('hidden');
